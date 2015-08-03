@@ -1,0 +1,7 @@
+*.ibc
+*.*~
+*.*swp
+.*.swo
+*.js
+*.html
+main
