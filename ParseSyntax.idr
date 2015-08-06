@@ -54,8 +54,9 @@ namespace RawSyn
 
   {- assert_total is necessary here because RawSyn isn't tagged with depth information, so there's no argument to
      tagDepth that decreases in size in the expression "map tagDepth" that the totality checker can latch
-     onto. It should be impossible to construct an infinite RawSyn because it should be impossible to input an
-     infinite amount of source code, so this won't ever fail to terminate. -}
+     onto. It should be impossible to construct an infinite RawSyn because it should be impossible to parse an
+     infinite amount of source code in finite time, so this won't ever fail to terminate unless parseSyn already
+     failed to terminate first. -}
   tagDepth (Tuple rs) =
     let (ds ** ss) = unzipToPiVect (map (assert_total tagDepth) rs) in
     let (d ** ps) = upperBound ds in
