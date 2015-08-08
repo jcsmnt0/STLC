@@ -25,7 +25,7 @@ rep = do
        -- every step should return an Either, this is ugly
        case runParser parseSyn (unpack src) of
          Nothing => putStrLn ("bad syntax: " ++ show src)
-         Just (s, rest) =>
+         Just (MkResult s rest _) =>
            let (_ ** sc) = tagDepth s in
              case scopecheck builtinNames sc of
                Left err => putStrLn ("bad scope: " ++ show err)

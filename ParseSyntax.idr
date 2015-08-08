@@ -5,14 +5,15 @@ import PiVect
 import Syntax
 import Ty
 
-import Util.Dec
-import Util.LTE
 import Util.Vect
 
 %default total
 
 namespace RawSyn
   ||| Raw syntax, without any depth or scope or type information.
+  ||| Only really exists because it's a hassle to write parsers that return (d : Nat ** Syn d) and do all the
+  ||| lifting inside the parser code, so instead these parsing functions return RawSyns that can be converted to
+  ||| depth-tagged Syns afterward.
   data RawSyn
     = Var String
     | Num Float
@@ -22,48 +23,47 @@ namespace RawSyn
     | If RawSyn RawSyn RawSyn
     | Tuple (Vect n RawSyn)
 
-  tagDepth :
-    RawSyn ->
-    (d ** Syn d)
+  namespace tagDepth
+    tagDepth :
+      RawSyn ->
+      (d ** Syn d)
 
-  tagDepth (Var v) =
-    (Z ** Var v)
+    tagDepth (Var v) =
+      (Z ** Var v)
 
-  tagDepth (Num x) =
-    (Z ** Num x)
+    tagDepth (Num x) =
+      (Z ** Num x)
 
-  tagDepth (Bool x) =
-    (Z ** Bool x)
+    tagDepth (Bool x) =
+      (Z ** Bool x)
 
-  tagDepth (Lam v ty r) =
-    let (d ** s) = tagDepth r in
-      (S d ** Lam v ty s)
+    tagDepth (Lam v ty r) =
+      let (d ** s) = tagDepth r in
+        (S d ** Lam v ty s)
 
-  tagDepth (rx :$ ry) =
-    let (dx ** sx) = tagDepth rx in
-    let (dy ** sy) = tagDepth ry in
-    let (d ** [px, py]) = upperBound [dx, dy] in
-      (S d ** lift px sx :$ lift py sy)
+    tagDepth (rx :$ ry) =
+      let (dx ** sx) = tagDepth rx in
+      let (dy ** sy) = tagDepth ry in
+      let (d ** [px, py]) = upperBound [dx, dy] in
+        (S d ** lift px sx :$ lift py sy)
 
-  tagDepth (If rb rt rf) =
-    let (db ** sb) = tagDepth rb in
-    let (dt ** st) = tagDepth rt in
-    let (df ** sf) = tagDepth rf in
-    let (d ** [pb, pt, pf]) = upperBound [db, dt, df] in
-      (S d ** If (lift pb sb) (lift pt st) (lift pf sf))
+    tagDepth (If rb rt rf) =
+      let (db ** sb) = tagDepth rb in
+      let (dt ** st) = tagDepth rt in
+      let (df ** sf) = tagDepth rf in
+      let (d ** [pb, pt, pf]) = upperBound [db, dt, df] in
+        (S d ** If (lift pb sb) (lift pt st) (lift pf sf))
 
-  {- assert_total is necessary here because RawSyn isn't tagged with depth information, so there's no argument to
-     tagDepth that decreases in size in the expression "map tagDepth" that the totality checker can latch
-     onto. It should be impossible to construct an infinite RawSyn because it should be impossible to parse an
-     infinite amount of source code in finite time, so this won't ever fail to terminate unless parseSyn already
-     failed to terminate first. -}
-  tagDepth (Tuple rs) =
-    let (ds ** ss) = unzipToPiVect (map (assert_total tagDepth) rs) in
-    let (d ** ps) = upperBound ds in
-      (S d ** Tuple (zipWithIdToVect (lift {n = d}) ps ss))
+    {- assert_total is necessary here because RawSyn isn't tagged with depth information, so there's no argument to
+       tagDepth that decreases in size in the expression "map tagDepth" that the totality checker can latch
+       onto. This should be total because it should be impossible to build an infinitely deep RawSyn value via any
+       total computation, and the totality checker will catch the case where it's called on a RawSyn constructed by
+       a partial (or non-totality-checkable) computation. -}
+    tagDepth (Tuple rs) =
+      let (ds ** ss) = unzipToPiVect (map (assert_total tagDepth) rs) in
+      let (d ** ps) = upperBound ds in
+        (S d ** Tuple (zipWithIdToVect (lift {n = d}) ps ss))
 
--- it should probably be possible to have the parsers return things of type (d ** Syn d)
--- in order to get around the issue of depth tagging not being structurally recursive
 SynParser : Type
 SynParser = StringParser RawSyn
 
@@ -88,7 +88,8 @@ keywords =
   ]
 
 {- It seems like there's no hope of getting these parsers to pass the totality checker - at least not without
-   a different implementation of the Parser monad, but I'm not sure what that implementation would look like. -}
+   a different implementation of the Parser monad, but I'm not sure what that implementation would look like or
+   whether it even exists in theory. -}
 %default partial
 
 parseIdent : StringParser String
@@ -119,6 +120,12 @@ parseTy = parseFunTy <|> parseParens <|> parseBaseTy
         tys <- sep1 (exactly ',' *> spaces) parseTy <* spaces <* exactly ')'
         let (_ ** tys') = toVect tys
         return (Tuple tys')
+
+    -- why?
+    -- parseSumTy : StringParser Ty
+    -- parseSumTy = do
+    --   (_ ** tys) <- toVect <$> between '[' ']' (sep1 (spaces *> '|' *> spaces) parseTy)
+    --   return (Sum tys)
 
     parseFunTy : StringParser Ty
     parseFunTy = do
