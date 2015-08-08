@@ -22,9 +22,9 @@ toType Bool = Bool
 toType Num = Float
 toType (s :-> t) = toType s -> toType t
 toType (Tuple []) = ()
-toType (Tuple (ty :: [])) = assert_total (toType ty)
-toType (Tuple (ty :: tys)) = assert_total (toType ty, toType (Tuple tys))
-toType _ = Void
+toType (Tuple tys@(_ :: _)) = foldr1 Pair (map (assert_total toType) tys)
+toType (Sum []) = Void
+toType (Sum tys@(_ :: _)) = foldr1 Either (map (assert_total toType) tys)
 
 namespace BTy
   ||| Types whose values can be translated between the metalanguage and object language ("bidirectional" types)
@@ -35,7 +35,7 @@ namespace BTy
   toTy Num = Num
 
   toType : BTy -> Type
-  toType ty = toType (toTy ty)
+  toType bty = toType (toTy bty)
 
 TyCtxt : Nat -> Type
 TyCtxt n = Vect n Ty
