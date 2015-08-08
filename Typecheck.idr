@@ -39,7 +39,6 @@ typecheck gty (scx :$ scy) with (typecheck gty scx, typecheck gty scy)
     typecheck _ _ | _ | No _ = Nothing
   typecheck _ _ | _ = Nothing
 
--- If should be a primitive, get this shit for free
 typecheck gty (If scx scy scz) with (typecheck gty scx, typecheck gty scy, typecheck gty scz)
   typecheck _ _ | (Just (Bool ** tmx), Just (a ** tmy), Just (b ** tmz)) with (a =? b)
     typecheck _ _ | (Just (Bool ** tmx), Just (a ** tmy), Just (a ** tmz)) | Yes Refl = Just (_ ** If tmx tmy tmz)

@@ -9,6 +9,8 @@ import Ty
 
 %default total
 
+infixl 5 :$
+
 namespace Pat
   data Pat : Type where
     Val :
@@ -44,7 +46,6 @@ namespace Match
       Match (Prim argTys retTy f) (Tuple (map toTy argTys)) (toTy retTy)
 
 namespace Term
-  infixl 5 :$
   data Term : Nat -> TyCtxt n -> Ty -> Type where
     Bool :
       Bool ->
