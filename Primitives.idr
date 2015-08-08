@@ -32,7 +32,7 @@ builtinNames = map fst builtinSigs
 builtinTys : Vect (length builtinSigs) Ty
 builtinTys = map snd builtinSigs
 
-builtinTerms : TermVect 4 [] (map snd builtinSigs)
+builtinTerms : PiVect (Term 4 []) (map snd builtinSigs)
 builtinTerms =
   [ Lam "x"
       (Lam "y"
@@ -125,5 +125,5 @@ builtinTerms =
           (Var "x /= y" Here)))
   ]
 
-partial builtinVals : ValVect builtinTys
+partial builtinVals : PiVect Val builtinTys
 builtinVals = mapId {ps = builtinTys} (impatience . eval []) builtinTerms

@@ -5,6 +5,7 @@ import Data.Vect
 import ParseSyntax
 import Parser
 import Partial
+import PiVect
 import Primitives
 import Scopecheck
 import Show

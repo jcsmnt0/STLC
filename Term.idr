@@ -9,7 +9,7 @@ import Ty
 
 %default total
 
-namespace pat
+namespace Pat
   data Pat : Type where
     Val :
       Pat
@@ -28,7 +28,7 @@ namespace pat
       Func (map BTy.toType argTys) (BTy.toType retTy) ->
       Pat
 
-namespace match
+namespace Match
   data Match : Pat -> Ty -> Ty -> Type where
     Val :
       Match Val a a
@@ -43,44 +43,92 @@ namespace match
       (f : Func (map BTy.toType argTys) (BTy.toType retTy)) ->
       Match (Prim argTys retTy f) (Tuple (map toTy argTys)) (toTy retTy)
 
-mutual
-  TermVect : Nat -> TyCtxt m -> Vect n Ty -> Type
-  TermVect d gty as = PiVect (Term d gty) as
-
-  CaseVect : Nat -> TyCtxt m -> Vect n Ty -> Ty -> Type
-  CaseVect d gty as b = PiVect (\a => Term d (a :: gty) b) as
-
+namespace Term
   infixl 5 :$
   data Term : Nat -> TyCtxt n -> Ty -> Type where
-    Bool : Bool -> Term d g Bool
-    Num : Float -> Term d g Num
-    Tuple : TermVect d g as -> Term (S d) g (Tuple as)
-    Variant : Elem a as -> Term d g a -> Term (S d) g (Sum as)
-    Case : CaseVect d g as b -> Term d g (Sum as) -> Term (S d) g b
-    Match : Match p a b -> Term d g a -> Term d (b :: g) c -> Term (S d) g c
-    Var : String -> Elem a g -> Term d g a
-    Lam : String -> Term d (b :: g) a -> Term (S d) g (b :-> a)
-    LamRec : Term d ((b :-> a) :: b :: g) a -> Term (S d) g (b :-> a)
-    (:$) : Term d g (b :-> a) -> Term d g b -> Term (S d) g a
-    If : Term d g Bool -> Term d g a -> Term d g a -> Term (S d) g a
+    Bool :
+      Bool ->
+      Term d g Bool
 
-mutual
-  ValVect : TyCtxt n -> Type
-  ValVect as = PiVect Val as
+    Num :
+      Float ->
+      Term d g Num
 
-  ValEnv : TyCtxt n -> Type
-  ValEnv as = PiVect Val as
+    Tuple :
+      PiVect (Term d g) as ->
+      Term (S d) g (Tuple as)
 
-  namespace Val
-    data Val : Ty -> Type where
-      Bool : Bool -> Val Bool
-      Num : Float -> Val Num
-      Tuple : ValVect as -> Val (Tuple as)
-      Variant : Elem a as -> Val a -> Val (Sum as)
-      Cls : String -> ValEnv g -> Term d (a :: g) b -> Val (a :-> b)
-      ClsRec : ValEnv g -> Term d ((a :-> b) :: a :: g) b -> Val (a :-> b)
+    Variant :
+      Elem a as ->
+      Term d g a ->
+      Term (S d) g (Sum as)
+
+    Case :
+      PiVect (\a => Term d (a :: g) b) as ->
+      Term d g (Sum as) ->
+      Term (S d) g b
+
+    Match :
+      Match p a b ->
+      Term d g a ->
+      Term d (b :: g) c ->
+      Term (S d) g c
+
+    Var :
+      String ->
+      Elem a g ->
+      Term d g a
+
+    Lam :
+      String ->
+      Term d (b :: g) a ->
+      Term (S d) g (b :-> a)
+
+    LamRec :
+      Term d ((b :-> a) :: b :: g) a ->
+      Term (S d) g (b :-> a)
+
+    (:$) :
+      Term d g (b :-> a) ->
+      Term d g b ->
+      Term (S d) g a
+
+    If :
+      Term d g Bool ->
+      Term d g a ->
+      Term d g a ->
+      Term (S d) g a
 
 namespace Val
+  data Val : Ty -> Type where
+    Bool :
+      Bool ->
+      Val Bool
+
+    Num :
+      Float ->
+      Val Num
+
+    Tuple :
+      PiVect Val as ->
+      Val (Tuple as)
+
+    Variant :
+      Elem a as ->
+      Val a ->
+      Val (Sum as)
+
+    Cls :
+      String ->
+      PiVect Val g ->
+      Term d (a :: g) b ->
+      Val (a :-> b)
+
+    ClsRec :
+      PiVect Val g ->
+      Term d ((a :-> b) :: a :: g) b ->
+      Val (a :-> b)
+
   reify : Val (toTy a) -> BTy.toType a
   reify {a = Bool} (Bool x) = x
   reify {a = Num} (Num x) = x
@@ -94,13 +142,13 @@ namespace Val
   extractMatch (Index i) (Tuple vs) = index i vs
   extractMatch (Prim _ _ f) (Tuple vs) = unreify (applyPrim f vs)
     where
-      applyPrim : Func (map BTy.toType as) (BTy.toType b) -> ValVect (map toTy as) -> BTy.toType b
+      applyPrim : Func (map BTy.toType as) (BTy.toType b) -> PiVect Val (map toTy as) -> BTy.toType b
       applyPrim {as = []} x [] = x
       applyPrim {as = _ :: _} f (x :: xs) = applyPrim (f (reify x)) xs
 
 namespace eval
   eval :
-    ValEnv g ->
+    PiVect Val g ->
     Term d g a ->
     Partial (Val a)
 
@@ -119,7 +167,7 @@ namespace eval
   eval p (Case cs t) =
     eval p t >>= evalCase p cs
   where
-    evalCase : ValEnv g -> CaseVect d g as b -> Val (Sum as) -> Partial (Val b)
+    evalCase : PiVect Val g -> PiVect (\a => Term d (a :: g) b) as -> Val (Sum as) -> Partial (Val b)
     evalCase p (c :: _) (Variant Here v) = Later (eval (v :: p) c)
     evalCase p (_ :: cs) (Variant (There e) v) = evalCase p cs (Variant e v)
 
