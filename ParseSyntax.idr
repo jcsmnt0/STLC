@@ -64,8 +64,21 @@ namespace RawSyn
       let (d ** ps) = upperBound ds in
         (S d ** Tuple (zipWithIdToVect (lift {n = d}) ps ss))
 
+data SynParseError
+  = ParseError ParseError
+  | TyError String
+  | IdentError String
+
+instance Show SynParseError where
+  show (ParseError p) = show p
+  show (TyError ty) = ty ++ " is not a valid type"
+  show (IdentError ident) = ident ++ " is not a valid identifier"
+
+instance Cast ParseError SynParseError where
+  cast = ParseError
+
 SynParser : Type
-SynParser = StringParser RawSyn
+SynParser = StringParser SynParseError RawSyn
 
 isLowercaseLetter : Char -> Bool
 isLowercaseLetter c = 'a' <= c && c <= 'z'
@@ -92,42 +105,36 @@ keywords =
    whether it even exists in theory. -}
 %default partial
 
-parseIdent : StringParser String
+parseIdent : StringParser SynParseError String
 parseIdent = pack <$> guard isValid (many1 (match isIdentChar <|> match isDigit))
   where
     isValid : List Char -> Bool
     isValid [] = False -- can't happen because of many1
     isValid (x :: _) = not (isDigit x)
 
-parseTy : StringParser Ty
+parseTy : StringParser SynParseError Ty
 parseTy = parseFunTy <|> parseParens <|> parseBaseTy
   where
-    parseBaseTy : StringParser Ty
+    parseBaseTy : StringParser SynParseError Ty
     parseBaseTy = do
       ty <- many (match isLowercaseLetter <|> match isUppercaseLetter)
       case pack ty of
         "Num" => return Num
         "Bool" => return Bool
-        _ => fail
+        ty' => failWith (TyError ty')
 
-    parseParens : StringParser Ty
+    parseParens : StringParser SynParseError Ty
     parseParens = do
       exactly '(' *> spaces
       parseTupleTy <|> (parseTy <* spaces <* exactly ')')
     where
-      parseTupleTy : StringParser Ty
+      parseTupleTy : StringParser SynParseError Ty
       parseTupleTy = do
         tys <- sep1 (exactly ',' *> spaces) parseTy <* spaces <* exactly ')'
         let (_ ** tys') = toVect tys
         return (Tuple tys')
 
-    -- why?
-    -- parseSumTy : StringParser Ty
-    -- parseSumTy = do
-    --   (_ ** tys) <- toVect <$> between '[' ']' (sep1 (spaces *> '|' *> spaces) parseTy)
-    --   return (Sum tys)
-
-    parseFunTy : StringParser Ty
+    parseFunTy : StringParser SynParseError Ty
     parseFunTy = do
       a <- parseBaseTy <|> parseParens
       let separator = spaces *> roughly "->" *> spaces
@@ -153,7 +160,7 @@ parseSyn = parseApp <|> parseParens <|> parseLam <|> parseNat <|> parseKeyword <
           spaces1 *> roughly "else" *> spaces1
           f <- parseSyn
           return (If body t f)
-        _ => fail
+        ident => failWith (IdentError ident)
 
     parseNat : SynParser
     parseNat = do
