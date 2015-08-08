@@ -126,13 +126,19 @@ parseTy = parseFunTy <|> parseParens <|> parseBaseTy
     parseParens : StringParser SynParseError Ty
     parseParens = do
       exactly '(' *> spaces
-      parseTupleTy <|> (parseTy <* spaces <* exactly ')')
+      parseTupleTy <|> parseSumTy <|> (parseTy <* spaces <* exactly ')')
     where
       parseTupleTy : StringParser SynParseError Ty
       parseTupleTy = do
         tys <- sep1 (exactly ',' *> spaces) parseTy <* spaces <* exactly ')'
         let (_ ** tys') = toVect tys
         return (Tuple tys')
+
+      parseSumTy : StringParser SynParseError Ty
+      parseSumTy = do
+        tys <- sep1 (spaces *> exactly '|' <* spaces) parseTy <* spaces <* exactly ')'
+        let (_ ** tys') = toVect tys
+        return (Sum tys')
 
     parseFunTy : StringParser SynParseError Ty
     parseFunTy = do

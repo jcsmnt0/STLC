@@ -20,7 +20,7 @@ instance Show Ty where
   show Bool = "Bool"
   show Num = "Num"
   show (Tuple tys) = "(" ++ sepConcat ", " (map show tys) ++ ")"
-  show (Sum tys) = "[" ++ sepConcat " | " (map show tys) ++ ")"
+  show (Sum tys) = "(" ++ sepConcat " | " (map show tys) ++ ")"
   show ((s :-> t) :-> r) = "(" ++ show (s :-> t) ++ ")" ++ " -> " ++ show r
   show (s :-> t) = show s ++ " -> " ++ show t
 
