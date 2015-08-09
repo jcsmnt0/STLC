@@ -48,3 +48,9 @@ typecheck gty (If scx scy scz) with (typecheck gty scx, typecheck gty scy, typec
 typecheck gty (Tuple scs) = do
   tms <- sequence (map (typecheck gty) scs)
   return (_ ** Tuple (fromSigmas tms))
+
+typecheck gty (Variant {a = a} ety sc) with (typecheck gty sc)
+  typecheck gty (Variant {a = a} ety sc) | (Just (b ** tm)) with (a =? b)
+    typecheck gty (Variant ety sc) | (Just (a ** tm)) | Yes Refl = Just (_ ** Variant ety tm)
+    typecheck _ _ | _ | No _ = Nothing
+  typecheck _ _ | Nothing = Nothing
