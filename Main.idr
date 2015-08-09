@@ -10,6 +10,7 @@ import Primitives
 import Scopecheck
 import Show
 import Syntax
+import TagSyntaxDepth
 import Term
 import Ty
 import Typecheck
