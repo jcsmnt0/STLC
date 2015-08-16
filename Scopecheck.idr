@@ -7,6 +7,8 @@ import Ty
 
 import Util.Elem
 
+%default total
+
 scopecheck :
   (gv : Vect n String) ->
   (s : Syn d) ->
@@ -35,6 +37,12 @@ scopecheck gv (If sx sy sz) =
 scopecheck gv (Tuple ss) =
   [| Tuple (sequence (map (scopecheck gv) ss)) |]
 
+scopecheck gv (Variant ty s) =
+  [| (Variant ty) (scopecheck gv s) |]
+
+scopecheck gv (s `As` ty) =
+  [| (flip As ty) (scopecheck gv s) |]
+
 unscope : Scoped d gv -> Syn d
 unscope (Var {v = v} _) = Var v
 unscope (Num x) = Num x
@@ -43,3 +51,5 @@ unscope (Lam {v = v} ty s) = Lam v ty (unscope s)
 unscope (sx :$ sy) = unscope sx :$ unscope sy
 unscope (If sb st sf) = If (unscope sb) (unscope st) (unscope sf)
 unscope (Tuple ss) = Tuple (map unscope ss)
+unscope (Variant ty s) = Variant ty (unscope s)
+unscope (s `As` ty) = unscope s `As` ty

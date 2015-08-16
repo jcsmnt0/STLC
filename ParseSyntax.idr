@@ -128,7 +128,7 @@ mutual
         spaces1 *> roughly "else" *> spaces1
         f <- parseSyn
         let [b', t', f'] = liftExSyns [b, t, f]
-        returnEx (If b' t' f')
+        return (E $ If b' t' f')
       ident => failWith (IdentError ident)
 
   parseNat : SynParser
@@ -144,7 +144,7 @@ mutual
     ty <- parseTy
     exactly '.' *> spaces
     E expr <- parseSyn
-    returnEx (Lam var ty expr)
+    return (E $ Lam var ty expr)
 
   parseParenSyn : SynParser
   parseParenSyn = do
@@ -162,13 +162,13 @@ mutual
       let separator = spaces *> exactly ',' *> spaces
       E xs <- toVect <$> (separator *> sep1 separator parseSyn)
       exactly ')'
-      returnEx (Tuple (liftExSyns (x :: xs)))
+      return (E $ Tuple (liftExSyns (x :: xs)))
 
   parseApp : SynParser
   parseApp = do
     x <- parseArg
     E xs <- toVect <$> (spaces1 *> sep1 spaces1 parseArg)
-    returnEx (foldApp (liftExSyns (x :: xs)))
+    return (E $ foldApp (liftExSyns (x :: xs)))
   where
     parseArg : SynParser
     parseArg = parseParenSyn <|> parseLam <|> parseNat <|> parseKeyword <|> parseVar

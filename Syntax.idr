@@ -22,7 +22,8 @@ namespace Syn
     (:$) : Syn d -> Syn d -> Syn (S d)
     If : Syn d -> Syn d -> Syn d -> Syn (S d)
     Tuple : Vect n (Syn d) -> Syn (S d)
-    Variant : {a : Ty} -> Elem a as -> Syn d -> Syn (S d)
+    Variant : Nat -> Syn d -> Syn (S d)
+    As : Syn d -> Ty -> Syn d
 
   depth : Syn d -> Nat
   depth {d = d} _ = d
@@ -39,6 +40,7 @@ namespace Scoped
     (:$) : Scoped d gv -> Scoped d gv -> Scoped (S d) gv
     If : Scoped d gv -> Scoped d gv -> Scoped d gv -> Scoped (S d) gv
     Tuple : Vect n (Scoped d gv) -> Scoped (S d) gv
-    Variant : {a : Ty} -> Elem a as -> Scoped d gv -> Scoped (S d) gv
+    Variant : Nat -> Scoped d gv -> Scoped (S d) gv
+    As : Scoped d gv -> Ty -> Scoped d gv
 
 %name Scoped scx, scy, scz

@@ -22,17 +22,17 @@ typecheck :
   Maybe (Ex (Term d gty))
 
 typecheck gty (Var {v = v} p) =
-  returnEx (Var v (snd (iso p gty)))
+  return (E $ Var v (snd (iso p gty)))
 
 typecheck gty (Num n) =
-  returnEx (Num n)
+  return (E $ Num n)
 
 typecheck gty (Bool b) =
-  returnEx (Bool b)
+  return (E $ Bool b)
 
 typecheck gty (Lam {v = v} t scx) = do
   E tmx <- typecheck (t :: gty) scx
-  returnEx (Lam v tmx)
+  return (E $ Lam v tmx)
 
 typecheck gty (scx :$ scy) with (typecheck gty scx, typecheck gty scy)
   typecheck _ _ | (Just (E {x = a :-> b} tmx), Just (E {x = c} tmy)) with (a =? c)
@@ -48,10 +48,26 @@ typecheck gty (If scx scy scz) with (typecheck gty scx, typecheck gty scy, typec
 
 typecheck gty (Tuple scs) = do
   tms <- sequence (map (typecheck gty) scs)
-  returnEx (Tuple (unzip tms))
+  return (E $ Tuple (unzip tms))
 
-typecheck gty (Variant {a = a} ety sc) with (typecheck gty sc)
-  typecheck gty (Variant {a = a} ety sc) | (Just (E {x = b} tm)) with (a =? b)
-    typecheck gty (Variant ety sc) | (Just (E tm)) | Yes Refl = Just (E $ Variant ety tm)
-    typecheck _ _ | _ | No _ = Nothing
-  typecheck _ _ | Nothing = Nothing
+typecheck gty (Variant i s `As` Sum {n = n} tys) with (typecheck gty s, natToFin i n)
+  typecheck _ (Variant i s `As` Sum {n = n} tys) | (Just (E {x = ty} tm), Just i') with (ty =? index i' tys)
+    typecheck _ (Variant i s `As` Sum {n = n} tys) | (Just (E tm), Just i') | Yes Refl =
+      Just (E $ Variant (fromFin i' tys) tm)
+    typecheck _ (Variant i s `As` Sum {n = n} tys) | (Just (E tm), Just i') | No _ = Nothing
+  typecheck _ _ | _ = Nothing
+
+typecheck gty (s `As` ty) = do
+  E {x = ty'} tm <- typecheck gty s
+  case ty =? ty' of
+    Yes _ => Just (E tm)
+    No _ => Nothing
+
+typecheck gty (Variant i s) =
+  Nothing -- has to be wrapped in an As
+
+-- typecheck gty (Variant {a = a} ety sc) with (typecheck gty sc)
+--   typecheck gty (Variant {a = a} ety sc) | (Just (E {x = b} tm)) with (a =? b)
+--     typecheck gty (Variant ety sc) | (Just (E tm)) | Yes Refl = Just (E $ Variant ety tm)
+--     typecheck _ _ | _ | No _ = Nothing
+--   typecheck _ _ | Nothing = Nothing

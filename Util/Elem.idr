@@ -9,9 +9,9 @@ toFin : {xs : Vect n a} -> Elem x xs -> Fin n
 toFin Here = FZ
 toFin (There i) = FS (toFin i)
 
-fromFin : Fin n -> (xs : Vect n a) -> (x : a ** Elem x xs)
-fromFin FZ (x :: xs) = (x ** Here)
-fromFin (FS i) (_ :: xs) = let (x ** p) = fromFin i xs in (x ** There p)
+fromFin : (i : Fin n) -> (xs : Vect n a) -> Elem (index i xs) xs
+fromFin FZ (x :: xs) = Here
+fromFin (FS i) (_ :: xs) = let p = fromFin i xs in There p
 
 iso : {xs : Vect n a} -> (p : Elem x xs) -> (ys : Vect n b) -> (y : b ** Elem y ys)
 iso Here (_ :: _) = (_ ** Here)
@@ -44,4 +44,3 @@ decElem x (y :: ys) with (x =? y)
     case decElem x ys of
       Yes p => Yes (There p)
       No notThere => No (notElem notHere notThere)
-

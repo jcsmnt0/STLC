@@ -22,9 +22,3 @@ map f (E x) = f x
 -- there's a weird error sometimes with map and <$>
 ($$) : ({x : a} -> b x -> c) -> Ex b -> c
 ($$) = map
-
-pureEx : Applicative m => b x -> m (Ex b)
-pureEx = pure . E
-
-returnEx : Monad m => b x -> m (Ex b)
-returnEx = return . E
