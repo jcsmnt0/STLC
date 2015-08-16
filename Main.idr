@@ -10,10 +10,11 @@ import Primitives
 import Scopecheck
 import Show
 import Syntax
-import TagSyntaxDepth
 import Term
 import Ty
 import Typecheck
+
+import Util.Ex
 import Util.Monad
 
 %default partial
@@ -26,9 +27,8 @@ rep = do
      else
        case runParser parseSyn (unpack src) of
          Left err => putStrLn ("bad syntax: " ++ show err)
-         Right (MkResult s rest _) =>
-           let (_ ** sc) = tagDepth s in
-             case scopecheck builtinNames sc of
+         Right (MkResult (E s) rest _) =>
+             case scopecheck builtinNames s of
                Left err => putStrLn ("bad scope: " ++ show err)
                Right db =>
                  case typecheck builtinTys db of

@@ -4,6 +4,8 @@ import Data.Vect
 
 import Util.Dec
 
+%default total
+
 toVect : List a -> (n ** Vect n a)
 toVect [] = (_ ** [])
 toVect (x :: xs) = let (_ ** xs') = toVect xs in (_ ** x :: xs')

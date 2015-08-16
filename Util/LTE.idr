@@ -1,5 +1,7 @@
 module Util.LTE
 
+%default total
+
 decLTE : (m, n : Nat) -> Either (LTE m n) (LTE n m)
 decLTE Z _ = Left LTEZero
 decLTE _ Z = Right LTEZero
@@ -11,3 +13,7 @@ decLTE (S m) (S n) =
 lteTrans : x `LTE` y -> y `LTE` z -> x `LTE` z
 lteTrans LTEZero q = LTEZero
 lteTrans (LTESucc p) (LTESucc q) = LTESucc (lteTrans p q)
+
+ltePlusOne : LTE x (S x)
+ltePlusOne {x = Z} = LTEZero
+ltePlusOne {x = S _} = LTESucc ltePlusOne

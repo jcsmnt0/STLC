@@ -1,26 +1,18 @@
 module ParseSyntax
 
+import Data.Vect
+
 import Parser
 import PiVect
+import Syntax
 import Ty
 
+import Util.Ex
+import Util.LTE
+import Util.Sigma
 import Util.Vect
 
 %default total
-
-namespace RawSyn
-  ||| Raw syntax, without any depth or scope or type information.
-  ||| Only really exists because it's a hassle to write parsers that return (d : Nat ** Syn d) and do all the
-  ||| lifting inside the parser code, so instead these parsing functions return RawSyns that can be converted to
-  ||| depth-tagged Syns afterward.
-  data RawSyn
-    = Var String
-    | Num Float
-    | Bool Bool
-    | Lam String Ty RawSyn
-    | (:$) RawSyn RawSyn
-    | If RawSyn RawSyn RawSyn
-    | Tuple (Vect n RawSyn)
 
 data SynParseError
   = ParseError ParseError
@@ -36,7 +28,7 @@ instance Cast ParseError SynParseError where
   cast = ParseError
 
 SynParser : Type
-SynParser = StringParser SynParseError RawSyn
+SynParser = StringParser SynParseError (Ex Syn)
 
 isLowercaseLetter : Char -> Bool
 isLowercaseLetter c = 'a' <= c && c <= 'z'
@@ -58,9 +50,7 @@ keywords =
   , "def"
   ]
 
-{- It seems like there's no hope of getting these parsers to pass the totality checker - at least not without
-   a different implementation of the Parser monad, but I'm not sure what that implementation would look like or
-   whether it even exists in theory. -}
+
 %default partial
 
 parseIdent : StringParser SynParseError String
@@ -105,62 +95,92 @@ parseTy = parseFunTy <|> parseParens <|> parseBaseTy
       as <- separator *> sep1 separator parseTy
       return (foldr (:->) a as)
 
-parseSyn : SynParser
-parseSyn = parseApp <|> parseParens <|> parseLam <|> parseNat <|> parseKeyword <|> parseVar
+liftSyn : (m `LTE` n) -> Syn m -> Syn n
+liftSyn p (Var v) = Var v
+liftSyn p (Num x) = Num x
+liftSyn p (Bool x) = Bool x
+liftSyn (LTESucc p) (Lam v ty s) = Lam v ty (liftSyn p s)
+liftSyn (LTESucc p) (sx :$ sy) = liftSyn p sx :$ liftSyn p sy
+liftSyn (LTESucc p) (If sb st sf) = If (liftSyn p sb) (liftSyn p st) (liftSyn p sf)
+liftSyn (LTESucc p) (Tuple ss) = Tuple (map (liftSyn p) ss)
+liftSyn (LTESucc p) (Variant ety s) = Variant ety (liftSyn p s)
+
+liftSyns : {ds : Vect n Nat} -> (ss : PiVect Syn ds) -> Vect n (Syn (fst (upperBound ds)))
+liftSyns {ds = ds} ss = zipWithToVect liftSyn (snd (upperBound ds)) ss
+
+liftExSyns : (ss : Vect n (Ex Syn)) -> Vect n (Syn (fst (upperBound (map fst ss))))
+liftExSyns ss = liftSyns (unzipEx ss)
+
+E0 : b Z -> Ex b
+E0 = E
+
+mutual
+  parseSyn : SynParser
+  parseSyn = parseApp <|> parseParens <|> parseLam <|> parseNat <|> parseKeyword <|> parseVar
+
+  parseVar : SynParser
+  parseVar = E0 . Var <$> guard (\ident => not (elem ident keywords)) parseIdent
+
+  parseKeyword : SynParser
+  parseKeyword =
+    case !parseIdent of
+      "true" => return (E0 $ Bool True)
+      "false" => return (E0 $ Bool False)
+      "if" => do
+        spaces
+        E b <- parseSyn
+        spaces1 *> roughly "then" *> spaces1
+        E t <- parseSyn
+        spaces1 *> roughly "else" *> spaces1
+        E f <- parseSyn
+        let [b', t', f'] = liftSyns [b, t, f]
+        return (E $ If b' t' f')
+      ident => failWith (IdentError ident)
+
+  parseNat : SynParser
+  parseNat = do
+    xs <- many1 (match isDigit)
+    return (E0 $ Num (cast {to = Float} (pack xs)))
+
+  parseLam : SynParser
+  parseLam = do
+    exactly '\\' *> spaces
+    var <- parseIdent
+    spaces *> exactly ':' *> spaces
+    ty <- parseTy
+    exactly '.' *> spaces
+    E expr <- parseSyn
+    return (E $ Lam var ty expr)
+
+  parseParens : SynParser
+  parseParens = do
+    exactly '(' *> spaces
+    expr <- parseSyn
+    parseTuple expr <|> parseEndParen expr
   where
-    parseVar : SynParser
-    parseVar = Var <$> guard (\ident => not (elem ident keywords)) parseIdent
+    parseEndParen : Ex Syn -> SynParser
+    parseEndParen expr = do
+      spaces *> exactly ')'
+      return expr
 
-    parseKeyword : SynParser
-    parseKeyword =
-      case !parseIdent of
-        "true" => return (Bool True)
-        "false" => return (Bool False)
-        "if" => do
-          spaces
-          body <- parseSyn
-          spaces1 *> roughly "then" *> spaces1
-          t <- parseSyn
-          spaces1 *> roughly "else" *> spaces1
-          f <- parseSyn
-          return (If body t f)
-        ident => failWith (IdentError ident)
+    parseTuple : Ex Syn -> SynParser
+    parseTuple x = do
+      let separator = spaces *> exactly ',' *> spaces
+      (_ ** xs) <- toVect <$> (separator *> sep1 separator parseSyn)
+      exactly ')'
+      return (E $ Syn.Tuple (liftExSyns (x :: xs)))
 
-    parseNat : SynParser
-    parseNat = do
-      xs <- many1 (match isDigit)
-      return (Num (cast {to = Float} (pack xs)))
+  parseApp : SynParser
+  parseApp = do
+    x <- parseArg
+    (_ ** xs) <- toVect <$> (spaces1 *> sep1 spaces1 parseArg)
+    return (E $ foldApp (liftExSyns (x :: xs)))
+  where
+    parseArg : SynParser
+    parseArg = parseParens <|> parseLam <|> parseNat <|> parseKeyword <|> parseVar
 
-    parseLam : SynParser
-    parseLam = do
-      exactly '\\' *> spaces
-      var <- parseIdent
-      spaces *> exactly ':' *> spaces
-      ty <- parseTy
-      exactly '.' *> spaces
-      expr <- parseSyn
-      return (Lam var ty expr)
-
-    parseParens : SynParser
-    parseParens = do
-      exactly '(' *> spaces
-      expr <- parseSyn
-      parseTuple expr <|> parseEndParen expr
-    where
-      parseEndParen : RawSyn -> SynParser
-      parseEndParen expr = do
-        spaces *> exactly ')'
-        return expr
-
-      parseTuple : RawSyn -> SynParser
-      parseTuple x = do
-        let separator = spaces *> exactly ',' *> spaces
-        (_ ** xs) <- toVect <$> (separator *> sep1 separator parseSyn)
-        exactly ')'
-        return (Tuple (x :: xs))
-
-    parseApp : SynParser
-    parseApp = do
-      x <- parseParens <|> parseLam <|> parseNat <|> parseKeyword <|> parseVar
-      xs <- spaces1 *> sep1 spaces1 (parseParens <|> parseLam <|> parseNat <|> parseKeyword <|> parseVar)
-      return (foldl (:$) x xs)
+    foldApp : Vect (S n) (Syn d) -> Syn (n + d)
+    foldApp [s] = s
+    foldApp {n = S n} {d = d} (s1 :: s2 :: ss) =
+      rewrite plusSuccRightSucc n d in
+        foldApp ((s1 :$ s2) :: map (liftSyn ltePlusOne) ss)

@@ -3,6 +3,7 @@ module PiVect
 import Data.Fin
 import Data.Vect
 
+import Util.Ex
 import Util.LTE
 import Util.Sigma
 
@@ -33,6 +34,10 @@ namespace PiVect
   unzip {xs = []} [] = ([] ** [])
   unzip {xs = _ :: _} ((y ** p) :: prs) = let (ys ** ps) = unzip prs in (y :: ys ** p :: ps)
 
+  unzipEx : (xs : Vect n (Ex p)) -> PiVect p (map fst xs)
+  unzipEx [] = []
+  unzipEx (E x :: xs) = x :: unzipEx xs
+
   unzipToPiVect : Vect n (x : a ** b x) -> (xs : Vect n a ** PiVect b xs)
   unzipToPiVect [] = ([] ** [])
   unzipToPiVect ((x ** y) :: prs) = let (xs ** ys) = unzipToPiVect prs in (x :: xs ** y :: ys)
@@ -41,14 +46,14 @@ namespace PiVect
   mapToVect {ps = []} f [] = []
   mapToVect {ps = _ :: _} f (x :: xs) = f x :: mapToVect f xs
 
-  zipWithIdToVect :
+  zipWithToVect :
     {ps : Vect n a} ->
     ({x : a} -> p x -> q x -> c) ->
     PiVect p ps ->
     PiVect q ps ->
     Vect n c
-  zipWithIdToVect {ps = []} f [] [] = []
-  zipWithIdToVect {ps = _ :: _} f (x :: xs) (y :: ys) = f x y :: zipWithIdToVect f xs ys
+  zipWithToVect {ps = []} f [] [] = []
+  zipWithToVect {ps = _ :: _} f (x :: xs) (y :: ys) = f x y :: zipWithToVect f xs ys
 
   mapToPiVect : {p : a -> Type} -> (f : (x : a) -> p x) -> (ps : Vect n a) -> PiVect p ps
   mapToPiVect f [] = []

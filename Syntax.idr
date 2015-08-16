@@ -27,16 +27,6 @@ namespace Syn
   depth : Syn d -> Nat
   depth {d = d} _ = d
 
-  lift : (m `LTE` n) -> Syn m -> Syn n
-  lift p (Var v) = Var v
-  lift p (Num x) = Num x
-  lift p (Bool x) = Bool x
-  lift (LTESucc p) (Lam v ty s) = Lam v ty (lift p s)
-  lift (LTESucc p) (sx :$ sy) = lift p sx :$ lift p sy
-  lift (LTESucc p) (If sb st sf) = If (lift p sb) (lift p st) (lift p sf)
-  lift (LTESucc p) (Tuple ss) = Tuple (map (lift p) ss)
-  lift (LTESucc p) (Variant ety s) = Variant ety (lift p s)
-
 %name Syn sx, sy, sz
 
 namespace Scoped
