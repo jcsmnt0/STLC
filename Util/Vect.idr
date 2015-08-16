@@ -3,12 +3,13 @@ module Util.Vect
 import Data.Vect
 
 import Util.Dec
+import Util.Ex
 
 %default total
 
-toVect : List a -> (n ** Vect n a)
-toVect [] = (_ ** [])
-toVect (x :: xs) = let (_ ** xs') = toVect xs in (_ ** x :: xs')
+toVect : List a -> Ex (flip Vect a)
+toVect [] = E []
+toVect (x :: xs) = let E xs' = toVect xs in E (x :: xs')
 
 instance Uninhabited (Vect.Nil ~=~ x :: the (Vect m a) xs) where
   uninhabited Refl impossible

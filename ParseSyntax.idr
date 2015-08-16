@@ -77,16 +77,10 @@ parseTy = parseFunTy <|> parseParens <|> parseBaseTy
       parseTupleTy <|> parseSumTy <|> (parseTy <* spaces <* exactly ')')
     where
       parseTupleTy : StringParser SynParseError Ty
-      parseTupleTy = do
-        tys <- sep1 (exactly ',' *> spaces) parseTy <* spaces <* exactly ')'
-        let (_ ** tys') = toVect tys
-        return (Tuple tys')
+      parseTupleTy = (Tuple $$) . toVect <$> (sep1 (exactly ',' *> spaces) parseTy <* spaces <* exactly ')')
 
       parseSumTy : StringParser SynParseError Ty
-      parseSumTy = do
-        tys <- sep1 (spaces *> exactly '|' <* spaces) parseTy <* spaces <* exactly ')'
-        let (_ ** tys') = toVect tys
-        return (Sum tys')
+      parseSumTy = (Sum $$) . toVect <$> sep1 (spaces *> exactly '|' <* spaces) parseTy <* spaces <* exactly ')'
 
     parseFunTy : StringParser SynParseError Ty
     parseFunTy = do
@@ -166,14 +160,14 @@ mutual
     parseTuple : Ex Syn -> SynParser
     parseTuple x = do
       let separator = spaces *> exactly ',' *> spaces
-      (_ ** xs) <- toVect <$> (separator *> sep1 separator parseSyn)
+      E xs <- toVect <$> (separator *> sep1 separator parseSyn)
       exactly ')'
       return (E $ Syn.Tuple (liftExSyns (x :: xs)))
 
   parseApp : SynParser
   parseApp = do
     x <- parseArg
-    (_ ** xs) <- toVect <$> (spaces1 *> sep1 spaces1 parseArg)
+    E xs <- toVect <$> (spaces1 *> sep1 spaces1 parseArg)
     return (E $ foldApp (liftExSyns (x :: xs)))
   where
     parseArg : SynParser
