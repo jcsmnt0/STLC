@@ -18,29 +18,9 @@ namespace PiVect
     Nil : PiVect p []
     (::) : p x -> PiVect p xs -> PiVect p (x :: xs)
 
-  fromVect : Vect n a -> PiVect (const a) (replicate n ())
-  fromVect [] = []
-  fromVect (x :: xs) = x :: fromVect xs
-
-  fromSigmas : (ys : Vect n (x : a ** b x)) -> PiVect b (map Dependent.fst ys)
-  fromSigmas [] = []
-  fromSigmas (x :: xs) = (::) {x = Dependent.fst x} (Dependent.snd x) (fromSigmas xs)
-
-  unzip :
-    {p : Pair a b -> Type} ->
-    {xs : Vect n a} ->
-    PiVect (\x => (y : b ** p (x, y))) xs ->
-    (ys : Vect n b ** PiVect p (zip xs ys))
-  unzip {xs = []} [] = ([] ** [])
-  unzip {xs = _ :: _} ((y ** p) :: prs) = let (ys ** ps) = unzip prs in (y :: ys ** p :: ps)
-
-  unzipEx : (xs : Vect n (Ex p)) -> PiVect p (map fst xs)
-  unzipEx [] = []
-  unzipEx (E x :: xs) = x :: unzipEx xs
-
-  unzipToPiVect : Vect n (x : a ** b x) -> (xs : Vect n a ** PiVect b xs)
-  unzipToPiVect [] = ([] ** [])
-  unzipToPiVect ((x ** y) :: prs) = let (xs ** ys) = unzipToPiVect prs in (x :: xs ** y :: ys)
+  unzip : (xs : Vect n (Ex p)) -> PiVect p (map fst xs)
+  unzip [] = []
+  unzip (E x :: xs) = x :: unzip xs
 
   mapToVect : {ps : Vect n a} -> {p : a -> Type} -> (f : {x : a} -> p x -> q) -> PiVect p ps -> Vect n q
   mapToVect {ps = []} f [] = []
@@ -54,10 +34,6 @@ namespace PiVect
     Vect n c
   zipWithToVect {ps = []} f [] [] = []
   zipWithToVect {ps = _ :: _} f (x :: xs) (y :: ys) = f x y :: zipWithToVect f xs ys
-
-  mapToPiVect : {p : a -> Type} -> (f : (x : a) -> p x) -> (ps : Vect n a) -> PiVect p ps
-  mapToPiVect f [] = []
-  mapToPiVect f (x :: xs) = f x :: mapToPiVect f xs
 
   map :
     (f : a -> b) ->
@@ -97,20 +73,6 @@ namespace Vect
     PiVect p ps
   map f [] = []
   map f (x :: xs) = f x :: map f xs
-
-  zipWithR :
-    {ys : Vect n b} ->
-    (f : {y : b} -> a -> q y -> c) ->
-    Vect n a ->
-    PiVect q ys ->
-    Vect n c
-  zipWithR {ys = []} f [] [] = []
-  zipWithR {ys = _ :: _} f (x :: xs) (y :: ys) = f x y :: zipWithR f xs ys
-
-namespace Elem
-  piMapWithElem : (xs : Vect n a) -> ({x : a} -> Elem x xs -> b x) -> PiVect b xs
-  piMapWithElem [] _ = []
-  piMapWithElem (x :: xs) f = f Here :: piMapWithElem xs (f . There)
 
 namespace LTE
   -- this should be doable with generic PiVect functions

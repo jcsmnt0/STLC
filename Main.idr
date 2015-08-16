@@ -22,7 +22,7 @@ import Util.Monad
 rep : IO ()
 rep = do
   src <- getLine
-  if src == ""
+  if src == "exit"
      then return ()
      else
        case runParser parseSyn (unpack src) of
@@ -33,7 +33,7 @@ rep = do
                Right db =>
                  case typecheck builtinTys db of
                    Nothing => putStrLn ("bad types: " ++ show db)
-                   Just (ty ** tm) => do
+                   Just (E {x = ty} tm) => do
                      putStrLn ("\n" ++ show tm ++ " : " ++ show ty)
                      putStrLn "=>"
                      putStrLn (show (impatience (eval builtinVals tm)))

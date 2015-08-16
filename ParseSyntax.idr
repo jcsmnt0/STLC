@@ -61,7 +61,7 @@ parseIdent = pack <$> guard isValid (many1 (match isIdentChar <|> match isDigit)
     isValid (x :: _) = not (isDigit x)
 
 parseTy : StringParser SynParseError Ty
-parseTy = parseFunTy <|> parseParens <|> parseBaseTy
+parseTy = parseFunTy <|> parseParenTy <|> parseBaseTy
   where
     parseBaseTy : StringParser SynParseError Ty
     parseBaseTy = do
@@ -71,8 +71,8 @@ parseTy = parseFunTy <|> parseParens <|> parseBaseTy
         "Bool" => return Bool
         ty' => failWith (TyError ty')
 
-    parseParens : StringParser SynParseError Ty
-    parseParens = do
+    parseParenTy : StringParser SynParseError Ty
+    parseParenTy = do
       exactly '(' *> spaces
       parseTupleTy <|> parseSumTy <|> (parseTy <* spaces <* exactly ')')
     where
@@ -80,14 +80,14 @@ parseTy = parseFunTy <|> parseParens <|> parseBaseTy
       parseTupleTy = (Tuple $$) . toVect <$> (sep1 (exactly ',' *> spaces) parseTy <* spaces <* exactly ')')
 
       parseSumTy : StringParser SynParseError Ty
-      parseSumTy = (Sum $$) . toVect <$> sep1 (spaces *> exactly '|' <* spaces) parseTy <* spaces <* exactly ')'
+      parseSumTy = (Tuple $$) . toVect <$> sep1 (spaces *> exactly '|' <* spaces) parseTy <* spaces <* exactly ')'
 
     parseFunTy : StringParser SynParseError Ty
     parseFunTy = do
-      a <- parseBaseTy <|> parseParens
+      a <- parseBaseTy <|> parseParenTy
       let separator = spaces *> roughly "->" *> spaces
       as <- separator *> sep1 separator parseTy
-      return (foldr (:->) a as)
+      return (foldl (:->) a as)
 
 liftSyn : (m `LTE` n) -> Syn m -> Syn n
 liftSyn p (Var v) = Var v
@@ -103,14 +103,14 @@ liftSyns : {ds : Vect n Nat} -> (ss : PiVect Syn ds) -> Vect n (Syn (fst (upperB
 liftSyns {ds = ds} ss = zipWithToVect liftSyn (snd (upperBound ds)) ss
 
 liftExSyns : (ss : Vect n (Ex Syn)) -> Vect n (Syn (fst (upperBound (map fst ss))))
-liftExSyns ss = liftSyns (unzipEx ss)
+liftExSyns ss = liftSyns (unzip ss)
 
 E0 : b Z -> Ex b
 E0 = E
 
 mutual
   parseSyn : SynParser
-  parseSyn = parseApp <|> parseParens <|> parseLam <|> parseNat <|> parseKeyword <|> parseVar
+  parseSyn = parseApp <|> parseParenSyn <|> parseLam <|> parseNat <|> parseKeyword <|> parseVar
 
   parseVar : SynParser
   parseVar = E0 . Var <$> guard (\ident => not (elem ident keywords)) parseIdent
@@ -122,13 +122,13 @@ mutual
       "false" => return (E0 $ Bool False)
       "if" => do
         spaces
-        E b <- parseSyn
+        b <- parseSyn
         spaces1 *> roughly "then" *> spaces1
-        E t <- parseSyn
+        t <- parseSyn
         spaces1 *> roughly "else" *> spaces1
-        E f <- parseSyn
-        let [b', t', f'] = liftSyns [b, t, f]
-        return (E $ If b' t' f')
+        f <- parseSyn
+        let [b', t', f'] = liftExSyns [b, t, f]
+        returnEx (If b' t' f')
       ident => failWith (IdentError ident)
 
   parseNat : SynParser
@@ -144,10 +144,10 @@ mutual
     ty <- parseTy
     exactly '.' *> spaces
     E expr <- parseSyn
-    return (E $ Lam var ty expr)
+    returnEx (Lam var ty expr)
 
-  parseParens : SynParser
-  parseParens = do
+  parseParenSyn : SynParser
+  parseParenSyn = do
     exactly '(' *> spaces
     expr <- parseSyn
     parseTuple expr <|> parseEndParen expr
@@ -162,16 +162,16 @@ mutual
       let separator = spaces *> exactly ',' *> spaces
       E xs <- toVect <$> (separator *> sep1 separator parseSyn)
       exactly ')'
-      return (E $ Syn.Tuple (liftExSyns (x :: xs)))
+      returnEx (Tuple (liftExSyns (x :: xs)))
 
   parseApp : SynParser
   parseApp = do
     x <- parseArg
     E xs <- toVect <$> (spaces1 *> sep1 spaces1 parseArg)
-    return (E $ foldApp (liftExSyns (x :: xs)))
+    returnEx (foldApp (liftExSyns (x :: xs)))
   where
     parseArg : SynParser
-    parseArg = parseParens <|> parseLam <|> parseNat <|> parseKeyword <|> parseVar
+    parseArg = parseParenSyn <|> parseLam <|> parseNat <|> parseKeyword <|> parseVar
 
     foldApp : Vect (S n) (Syn d) -> Syn (n + d)
     foldApp [s] = s
