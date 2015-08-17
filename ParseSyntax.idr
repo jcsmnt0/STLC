@@ -80,10 +80,15 @@ parseTy = parseFunTy <|> parseParenTy <|> parseBaseTy
       parseTupleTy <|> parseSumTy <|> (parseTy <* spaces <* exactly ')')
     where
       parseTupleTy : TyParser
-      parseTupleTy = (Tuple $$) . toVect <$> (sep1 (exactly ',' *> spaces) parseTy <* spaces <* exactly ')')
+      parseTupleTy = do
+        -- Tuple . toVect <$> (sep1 (exactly ',' *> spaces) parseTy <* spaces <* exactly ')')
+        xs <- sep1 (spaces *> exactly ',' *> spaces) parseTy <* spaces <* exactly ')'
+        return (Tuple (toVect xs))
 
       parseSumTy : TyParser
-      parseSumTy = (Sum $$) . toVect <$> sep1 (spaces *> exactly '|' <* spaces) parseTy <* spaces <* exactly ')'
+      parseSumTy = do
+        xs <- sep1 (spaces *> exactly '|' *> spaces) parseTy <* spaces <* exactly ')'
+        return (Sum (toVect xs))
 
     parseFunTy : TyParser
     parseFunTy = do
@@ -188,15 +193,15 @@ mutual
     parseTuple : Ex Syn -> SynParser
     parseTuple x = do
       let separator = spaces *> exactly ',' *> spaces
-      E xs <- toVect <$> (separator *> sep1 separator parseSyn)
+      xs <- separator *> sep1 separator parseSyn
       exactly ')'
-      return (E $ Tuple (liftExSyns (x :: xs)))
+      return (E $ Tuple (liftExSyns (x :: toVect xs)))
 
   parseApp : SynParser
   parseApp = do
     x <- parseArg
-    E xs <- toVect <$> (spaces1 *> sep1 spaces1 parseArg)
-    return (E $ foldApp (liftExSyns (x :: xs)))
+    xs <- spaces1 *> sep1 spaces1 parseArg
+    return (E $ foldApp (liftExSyns (x :: toVect xs)))
   where
     parseArg : SynParser
     parseArg = choice [parseVariant, parseParenSyn, parseLam, parseNum, parseKeyword, parseVar]

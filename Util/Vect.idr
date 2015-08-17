@@ -7,9 +7,9 @@ import Util.Ex
 
 %default total
 
-toVect : List a -> Ex (flip Vect a)
-toVect [] = E []
-toVect (x :: xs) = let E xs' = toVect xs in E (x :: xs')
+toVect : (xs : List a) -> Vect (length xs) a
+toVect [] = []
+toVect (x :: xs) = x :: toVect xs
 
 instance Uninhabited (Vect.Nil ~=~ x :: the (Vect m a) xs) where
   uninhabited Refl impossible
