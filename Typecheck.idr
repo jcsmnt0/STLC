@@ -64,11 +64,11 @@ typecheck gty (s `As` ty) = do
     Yes _ => Just (E tm)
     No _ => Nothing
 
+typecheck gty (Fix ty s) with (typecheck (ty :: gty) s)
+  typecheck gty (Fix ty s) | (Just (E {x = ty'} tm)) with (ty =? ty')
+    typecheck gty (Fix ty s) | (Just (E {x = ty} tm)) | Yes Refl = return (E $ Fix tm)
+    typecheck _ _ | _ | No _ = Nothing
+  typecheck _ _ | Nothing = Nothing
+
 typecheck gty (Variant i s) =
   Nothing -- has to be wrapped in an As
-
--- typecheck gty (Variant {a = a} ety sc) with (typecheck gty sc)
---   typecheck gty (Variant {a = a} ety sc) | (Just (E {x = b} tm)) with (a =? b)
---     typecheck gty (Variant ety sc) | (Just (E tm)) | Yes Refl = Just (E $ Variant ety tm)
---     typecheck _ _ | _ | No _ = Nothing
---   typecheck _ _ | Nothing = Nothing

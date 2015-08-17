@@ -24,6 +24,7 @@ namespace Syn
     Tuple : Vect n (Syn d) -> Syn (S d)
     Variant : Nat -> Syn d -> Syn (S d)
     As : Syn d -> Ty -> Syn d
+    Fix : String -> Ty -> Syn d -> Syn (S d)
 
   depth : Syn d -> Nat
   depth {d = d} _ = d
@@ -40,3 +41,4 @@ namespace Scoped
     Tuple : Vect n (Scoped d gv) -> Scoped (S d) gv
     Variant : Nat -> Scoped d gv -> Scoped (S d) gv
     As : Scoped d gv -> Ty -> Scoped d gv
+    Fix : Ty -> Scoped d (v :: gv) -> Scoped (S d) gv

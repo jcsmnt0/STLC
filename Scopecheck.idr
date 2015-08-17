@@ -43,6 +43,9 @@ scopecheck gv (Variant ty s) =
 scopecheck gv (s `As` ty) =
   [| (flip As ty) (scopecheck gv s) |]
 
+scopecheck gv (Fix v ty s) =
+  [| (Fix ty) (scopecheck (v :: gv) s) |]
+
 unscope : Scoped d gv -> Syn d
 unscope (Var {v = v} _) = Var v
 unscope (Num x) = Num x
@@ -53,3 +56,4 @@ unscope (If sb st sf) = If (unscope sb) (unscope st) (unscope sf)
 unscope (Tuple ss) = Tuple (map unscope ss)
 unscope (Variant ty s) = Variant ty (unscope s)
 unscope (s `As` ty) = unscope s `As` ty
+unscope (Fix {v = v} ty s) = Fix v ty (unscope s)
