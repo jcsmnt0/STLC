@@ -22,7 +22,7 @@ typecheck :
   Maybe (Ex (Term d gty))
 
 typecheck gty (Var {v = v} p) =
-  return (E $ Var v (snd (iso p gty)))
+  return (E $ Var v (iso p gty))
 
 typecheck gty (Num n) =
   return (E $ Num n)

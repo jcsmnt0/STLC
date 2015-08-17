@@ -9,21 +9,21 @@ import Ty
 
 %default total
 
-builtinSigs : Vect 13 (String, Ty)
+builtinSigs : Vect 3 (String, Ty)
 builtinSigs =
   [ ("+", Num :-> Num :-> Num)
   , ("-", Num :-> Num :-> Num)
   , ("*", Num :-> Num :-> Num)
-  , ("/", Num :-> Num :-> Num)
-  , ("==", Num :-> Num :-> Bool) 
-  , ("<", Num :-> Num :-> Bool)
-  , ("<=", Num :-> Num :-> Bool)
-  , (">", Num :-> Num :-> Bool)
-  , (">=", Num :-> Num :-> Bool)
-  , ("!=", Num :-> Num :-> Bool)
-  , ("!", Bool :-> Bool)
-  , ("=", Bool :-> Bool :-> Bool)
-  , ("/=", Bool :-> Bool :-> Bool)
+  -- , ("/", Num :-> Num :-> Num)
+  -- , ("==", Num :-> Num :-> Bool) 
+  -- , ("<", Num :-> Num :-> Bool)
+  -- , ("<=", Num :-> Num :-> Bool)
+  -- , (">", Num :-> Num :-> Bool)
+  -- , (">=", Num :-> Num :-> Bool)
+  -- , ("!=", Num :-> Num :-> Bool)
+  -- , ("!", Bool :-> Bool)
+  -- , ("=", Bool :-> Bool :-> Bool)
+  -- , ("/=", Bool :-> Bool :-> Bool)
   ]
 
 builtinNames : Vect (length builtinSigs) String
@@ -32,97 +32,59 @@ builtinNames = map fst builtinSigs
 builtinTys : Vect (length builtinSigs) Ty
 builtinTys = map snd builtinSigs
 
+-- well damn - typechecking these is (figuratively, but practically) interminable
 builtinTerms : PiVect (Term 4 []) (map snd builtinSigs)
 builtinTerms =
   [ Lam "x"
       (Lam "y"
-        (Match
-          (Prim [Num, Num] Num (+))
-          (Tuple [Var "x" (There Here), Var "y" Here])
-          (Var "x + y" Here)))
+        (Prim [Num, Num] Num (\[x, y] => Now $ x + y) [Var "x" (There Here), Var "y" Here]))
 
   , Lam "x"
       (Lam "y"
-        (Match
-          (Prim [Num, Num] Num (-))
-          (Tuple [Var "x" (There Here), Var "y" Here])
-          (Var "x - y" Here)))
+        (Prim [Num, Num] Num (\[x, y] => Now $ x - y) [Var "x" (There Here), Var "y" Here]))
 
   , Lam "x"
       (Lam "y"
-        (Match
-          (Prim [Num, Num] Num (*))
-          (Tuple [Var "x" (There Here), Var "y" Here])
-          (Var "x * y" Here)))
+        (Prim [Num, Num] Num (\[x, y] => Now $ x * y) [Var "x" (There Here), Var "y" Here]))
 
-  , Lam "x"
-      (Lam "y"
-        (Match
-          (Prim [Num, Num] Num (/))
-          (Tuple [Var "x" (There Here), Var "y" Here])
-          (Var "x / y" Here)))
+  -- , Lam "x"
+  --     (Lam "y"
+  --       (Prim [Num, Num] Num (\[x, y] => Now $ x / y) [Var "x" (There Here), Var "y" Here]))
 
-  , Lam "x"
-      (Lam "y"
-        (Match
-          (Prim [Num, Num] Bool (==))
-          (Tuple [Var "x" (There Here), Var "y" Here])
-          (Var "x == y" Here)))
+  -- , Lam "x"
+  --     (Lam "y"
+  --       (Prim [Num, Num] Bool (\[x, y] => Now $ x == y) [Var "x" (There Here), Var "y" Here]))
 
-  , Lam "x"
-      (Lam "y"
-        (Match
-          (Prim [Num, Num] Bool (<))
-          (Tuple [Var "x" (There Here), Var "y" Here])
-          (Var "x < y" Here)))
+  -- , Lam "x"
+  --     (Lam "y"
+  --       (Prim [Num, Num] Bool (\[x, y] => Now $ x < y) [Var "x" (There Here), Var "y" Here]))
 
-  , Lam "x"
-      (Lam "y"
-        (Match
-          (Prim [Num, Num] Bool (<=))
-          (Tuple [Var "x" (There Here), Var "y" Here])
-          (Var "x <= y" Here)))
+  -- , Lam "x"
+  --     (Lam "y"
+  --       (Prim [Num, Num] Bool (\[x, y] => Now $ x <= y) [Var "x" (There Here), Var "y" Here]))
 
-  , Lam "x"
-      (Lam "y"
-        (Match
-          (Prim [Num, Num] Bool (>))
-          (Tuple [Var "x" (There Here), Var "y" Here])
-          (Var "x > y" Here)))
+  -- , Lam "x"
+  --     (Lam "y"
+  --       (Prim [Num, Num] Bool (\[x, y] => Now $ x > y) [Var "x" (There Here), Var "y" Here]))
 
-  , Lam "x"
-      (Lam "y"
-        (Match
-          (Prim [Num, Num] Bool (>=))
-          (Tuple [Var "x" (There Here), Var "y" Here])
-          (Var "x >= y" Here)))
+  -- , Lam "x"
+  --     (Lam "y"
+  --       (Prim [Num, Num] Bool (\[x, y] => Now $ x >= y) [Var "x" (There Here), Var "y" Here]))
 
-  , Lam "x"
-      (Lam "y"
-        (Match
-          (Prim [Num, Num] Bool (/=))
-          (Tuple [Var "x" (There Here), Var "y" Here])
-          (Var "x /= y" Here)))
+  -- , Lam "x"
+  --     (Lam "y"
+  --       (Prim [Num, Num] Bool (\[x, y] => Now $ x /= y) [Var "x" (There Here), Var "y" Here]))
 
-  , Lam "x"
-      (Match
-        (Prim [Bool] Bool not)
-        (Tuple [Var "x" Here])
-        (Var "!x" Here))
+  -- , Lam "x"
+  --     (Prim [Bool] Bool (\[x] => Now $ not x) [Var "x" Here])
 
-  , Lam "x"
-      (Lam "y"
-        (Match
-          (Prim [Bool, Bool] Bool (==))
-          (Tuple [Var "x" (There Here), Var "y" Here])
-          (Var "x = y" Here)))
+  -- , Lam "x"
+  --     (Lam "y"
+  --       (Prim [Bool, Bool] Bool (\[x, y] => Now $ x == y) [Var "x" (There Here), Var "y" Here]))
 
-  , Lam "x"
-      (Lam "y"
-        (Match
-          (Prim [Bool, Bool] Bool (/=))
-          (Tuple [Var "x" (There Here), Var "y" Here])
-          (Var "x /= y" Here)))
+  -- , Lam "x"
+  --     (Lam "y"
+  --       (Prim [Bool, Bool] Bool (\[x, y] => Now $ x /= y) [Var "x" (There Here), Var "y" Here]))
   ]
 
 partial builtinVals : PiVect Val builtinTys

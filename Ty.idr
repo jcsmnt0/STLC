@@ -3,7 +3,11 @@ module Ty
 import Data.Fin
 import Data.Vect
 
+import Partial
+import PiVect
+
 import Util.Dec
+import Util.Union
 import Util.Vect
 
 %default total
@@ -20,25 +24,9 @@ data Ty
 toType : Ty -> Type
 toType Bool = Bool
 toType Num = Float
-toType (s :-> t) = toType s -> toType t
-toType (Tuple []) = ()
-toType (Tuple tys@(_ :: _)) = foldr1 Pair (map (assert_total toType) tys)
-toType (Sum []) = Void
-toType (Sum tys@(_ :: _)) = foldr1 Either (map (assert_total toType) tys)
-
-namespace BTy
-  ||| Types whose values can be translated between the metalanguage and object language ("bidirectional" types)
-  data BTy = Bool | Num
-
-  implicit toTy : BTy -> Ty
-  toTy Bool = Bool
-  toTy Num = Num
-
-  toType : BTy -> Type
-  toType bty = toType (toTy bty)
-
-TyCtxt : Nat -> Type
-TyCtxt n = Vect n Ty
+toType (s :-> t) = toType s -> Partial (toType t)
+toType (Tuple tys) = PiVect (assert_total toType) tys
+toType (Sum tys) = Union (map (assert_total toType) tys)
 
 instance Requires (Tuple ss = Tuple ts) (ss ~=~ ts) where
   because contra Refl = contra Refl

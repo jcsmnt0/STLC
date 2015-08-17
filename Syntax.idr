@@ -28,8 +28,6 @@ namespace Syn
   depth : Syn d -> Nat
   depth {d = d} _ = d
 
-%name Syn sx, sy, sz
-
 namespace Scoped
   ||| Terms that are well-scoped under gv, i.e. ones that don't contain any Var subterms with unbound identifiers.
   data Scoped : (d : Nat) -> (gv : Vect n String) -> Type where
@@ -42,5 +40,3 @@ namespace Scoped
     Tuple : Vect n (Scoped d gv) -> Scoped (S d) gv
     Variant : Nat -> Scoped d gv -> Scoped (S d) gv
     As : Scoped d gv -> Ty -> Scoped d gv
-
-%name Scoped scx, scy, scz

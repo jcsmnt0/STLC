@@ -7,46 +7,17 @@ import Partial
 import PiVect
 import Ty
 
+import Util.Elem
+import Util.Func
+import Util.Monad
+import Util.Union
+
 %default total
 
 infixl 5 :$
 
-namespace Pat
-  data Pat : Type where
-    Val :
-      Pat
-
-    Field :
-      String ->
-      Pat
-
-    Index :
-      Fin n ->
-      Pat
-
-    Prim :
-      (argTys : Vect n BTy) ->
-      (retTy : BTy) ->
-      Func (map BTy.toType argTys) (BTy.toType retTy) ->
-      Pat
-
-namespace Match
-  data Match : Pat -> Ty -> Ty -> Type where
-    Val :
-      Match Val a a
-
-    Index :
-      (i : Fin n) ->
-      Match (Index i) (Tuple as) (Vect.index i as)
-
-    Prim :
-      (argTys : Vect n BTy) ->
-      (retTy : BTy) ->
-      (f : Func (map BTy.toType argTys) (BTy.toType retTy)) ->
-      Match (Prim argTys retTy f) (Tuple (map toTy argTys)) (toTy retTy)
-
 namespace Term
-  data Term : Nat -> TyCtxt n -> Ty -> Type where
+  data Term : Nat -> Vect n Ty -> Ty -> Type where
     Bool :
       Bool ->
       Term d g Bool
@@ -69,11 +40,17 @@ namespace Term
       Term d g (Sum as) ->
       Term (S d) g b
 
-    Match :
-      Match p a b ->
-      Term d g a ->
-      Term d (b :: g) c ->
-      Term (S d) g c
+    Splat :
+      Term d g (Tuple as) ->
+      Term d (as ++ g) b ->
+      Term (S d) g b
+
+    Prim :
+      (as : Vect n Ty) ->
+      (b : Ty) ->
+      (f : PiVect toType as -> Partial (toType b)) ->
+      PiVect (Term d g) as ->
+      Term (S d) g b
 
     Var :
       String ->
@@ -130,24 +107,33 @@ namespace Val
       Term d ((a :-> b) :: a :: g) b ->
       Val (a :-> b)
 
-  reify : Val (toTy a) -> BTy.toType a
-  reify {a = Bool} (Bool x) = x
-  reify {a = Num} (Num x) = x
+mutual
+  reflect : Val a -> toType a
+  reflect {a = Bool} (Bool x) = x
+  reflect {a = Num} (Num x) = x
+  reflect {a = Tuple as} (Tuple xs) = mapId (assert_total reflect) xs -- tag ty's depth to avoid this
+  reflect {a = Sum []} (Variant p t) = absurd p
+  reflect {a = Sum (a :: as)} (Variant Here t) = Inj Here (reflect t)
+  reflect {a = Sum (a :: as)} (Variant (There p) t) = -- depth of a sum is + its length
+    let Inj p x = assert_total (reflect (Variant p t)) in
+      Inj (There p) x
+  reflect {a = a :-> b} (Cls v p tm) = \x => reflect <$> eval (unreflect x :: p) tm
+  reflect {a = a :-> b} cls@(ClsRec p tm) = \x => reflect <$> eval (cls :: unreflect x :: p) tm
 
-  unreify : BTy.toType a -> Val (toTy a)
-  unreify {a = Bool} = Bool
-  unreify {a = Num} = Num
+  unreflect : toType a -> Val a
+  unreflect {a = Bool} x = Bool x
+  unreflect {a = Num} x = Num x
+  unreflect {a = Tuple as} xs = Tuple (mapId (assert_total unreflect) xs)
+  unreflect {a = Sum (a :: as)} (Inj Here x) = Variant Here (assert_total (unreflect x))
+  unreflect {a = Sum (a :: as)} (Inj (There p) x) =
+    let Variant p t = assert_total (unreflect {a = Sum as} (Inj p x)) in
+      Variant (There p) t
+  unreflect {a = a :-> b} f =
+    Cls {d = 1} "<unreflected value>" [] (Prim [a] b (\[x] => f x) [Var "<unreflected var>" Here])
 
-  extractMatch : Match p a b -> Val a -> Val b
-  extractMatch Val v = v
-  extractMatch (Index i) (Tuple vs) = index i vs
-  extractMatch (Prim _ _ f) (Tuple vs) = unreify (applyPrim f vs)
-    where
-      applyPrim : Func (map BTy.toType as) (BTy.toType b) -> PiVect Val (map toTy as) -> BTy.toType b
-      applyPrim {as = []} x [] = x
-      applyPrim {as = _ :: _} f (x :: xs) = applyPrim (f (reify x)) xs
+  evalPiVect : PiVect Val g -> PiVect (Term d g) as -> Partial (PiVect Val as)
+  evalPiVect p = sequence . mapId (eval p)
 
-namespace eval
   eval :
     PiVect Val g ->
     Term d g a ->
@@ -160,7 +146,7 @@ namespace eval
     Now (Num x)
 
   eval {g = g} p (Tuple xs) =
-    Tuple <$> sequence {m = Partial} (mapId {q = Partial . Val} (eval p) xs)
+    Tuple <$> evalPiVect p xs
 
   eval p (Variant e t) =
     Variant e <$> eval p t
@@ -172,8 +158,12 @@ namespace eval
     evalCase p (c :: _) (Variant Here v) = Later (eval (v :: p) c)
     evalCase p (_ :: cs) (Variant (There e) v) = evalCase p cs (Variant e v)
 
-  eval p (Match m s t) =
-    Later (eval (extractMatch m !(eval p s) :: p) t)
+  eval p (Splat tm1 tm2) = do
+    Tuple xs <- eval p tm1
+    eval (xs ++ p) tm2
+
+  eval p (Prim as b f xs) =
+    unreflect <$> join (f . mapId reflect <$> evalPiVect p xs)
 
   eval p (Var v j) =
     Now (indexElem j p)

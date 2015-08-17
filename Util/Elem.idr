@@ -15,9 +15,9 @@ fromFin : (i : Fin n) -> (xs : Vect n a) -> Elem (index i xs) xs
 fromFin FZ (x :: xs) = Here
 fromFin (FS i) (_ :: xs) = let p = fromFin i xs in There p
 
-iso : {xs : Vect n a} -> (p : Elem x xs) -> (ys : Vect n b) -> (y : b ** Elem y ys)
-iso Here (_ :: _) = (_ ** Here)
-iso (There p) (_ :: ys) = let (_ ** q) = iso p ys in (_ ** There q)
+iso : {xs : Vect n a} -> (p : Elem x xs) -> (ys : Vect n b) -> Elem (index (toFin p) ys) ys
+iso Here (_ :: _) = Here
+iso (There p) (_ :: ys) = There (iso p ys)
 
 extend : {b : a -> Type} -> ({x : _} -> Elem x xs -> b x) -> b y -> Elem x (y :: xs) -> b x
 extend _ x Here = x

@@ -1,0 +1,6 @@
+package stlc
+
+modules = Main, Show, Util.Elem, Util.Monoid, Parser, Syntax, Util.Eq, Util.Sigma, ParseSyntax, Term, Util.Ex, Util.Union, Partial, Ty, Util.Fin, Util.Vect, PiVect, Typecheck, Primitives, Util.Dec, Util.LTE, Scopecheck, Util.Either, Util.Monad
+
+executable = stlc
+main = Main

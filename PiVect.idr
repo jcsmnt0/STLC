@@ -9,14 +9,14 @@ import Util.Sigma
 
 %default total
 
-Func : Vect n Type -> Type -> Type
-Func [] b = b
-Func (a :: as) b = a -> Func as b
-
 namespace PiVect
   data PiVect : (a -> Type) -> Vect n a -> Type where
     Nil : PiVect p []
     (::) : p x -> PiVect p xs -> PiVect p (x :: xs)
+
+  (++) : PiVect p as -> PiVect p bs -> PiVect p (as ++ bs)
+  [] ++ ys = ys
+  (x :: xs) ++ ys = x :: xs ++ ys
 
   unzip : (xs : Vect n (Ex p)) -> PiVect p (map fst xs)
   unzip [] = []
