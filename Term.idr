@@ -108,13 +108,14 @@ namespace Val
       Val (a :-> b)
 
 mutual
+  -- I think at least some of these assert_totals go away if Ty is tagged with its depth
   reflect : Val a -> toType a
   reflect {a = Bool} (Bool x) = x
   reflect {a = Num} (Num x) = x
-  reflect {a = Tuple as} (Tuple xs) = mapId (assert_total reflect) xs -- tag ty's depth to avoid this
+  reflect {a = Tuple as} (Tuple xs) = mapId (assert_total reflect) xs
   reflect {a = Sum []} (Variant p t) = absurd p
   reflect {a = Sum (a :: as)} (Variant Here t) = Inj Here (reflect t)
-  reflect {a = Sum (a :: as)} (Variant (There p) t) = -- depth of a sum is + its length
+  reflect {a = Sum (a :: as)} (Variant (There p) t) =
     let Inj p x = assert_total (reflect (Variant p t)) in
       Inj (There p) x
   reflect {a = a :-> b} (Cls v p tm) = \x => reflect <$> eval (unreflect x :: p) tm

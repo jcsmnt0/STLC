@@ -12,7 +12,8 @@ import Util.Vect
 
 %default total
 
--- needs to be depth tagged too, to make the assert_totals go away
+-- it seems like it's possible to tag Tys with depth like Terms and other things and avoid the assert_total calls,
+-- but it gets to be a really big hassle.
 infixr 2 :->
 data Ty
   = Bool

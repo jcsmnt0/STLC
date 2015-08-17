@@ -4,6 +4,7 @@ import Data.Fin
 import Data.Vect
 
 import Util.Dec
+import Util.Vect
 
 %default total
 
