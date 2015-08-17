@@ -50,6 +50,7 @@ typecheck gty (Tuple scs) = do
   tms <- sequence (map (typecheck gty) scs)
   return (E $ Tuple (unzip tms))
 
+-- also: typecheck gty (s `As` Sum tys) fallthrough for inference!
 typecheck gty (Variant i s `As` Sum {n = n} tys) with (typecheck gty s, natToFin i n)
   typecheck _ (Variant i s `As` Sum {n = n} tys) | (Just (E {x = ty} tm), Just i') with (ty =? index i' tys)
     typecheck _ (Variant i s `As` Sum {n = n} tys) | (Just (E tm), Just i') | Yes Refl =

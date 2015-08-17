@@ -11,10 +11,11 @@ import Ty
 import Typecheck
 
 import Util.Elem
+import Util.Ex
 import Util.Fin
 import Util.Monoid
 
-%default partial
+%default total
 
 instance Show Ty where
   show Bool = "Bool"
@@ -37,6 +38,8 @@ instance Show (Syn d) where
   show (x :$ y) = show x ++ " " ++ show y
   show (If b t f) = "if " ++ show b ++ " then " ++ show t ++ " else " ++ show f
   show (Tuple xs) = "(" ++ sepConcat ", " (map show xs) ++ ")"
+  show (Variant i s) = "variant " ++ show i ++ " " ++ show s
+  show (s `As` ty) = "(" ++ show s ++ " : " ++ show ty ++ ")"
 
 instance Show (Scoped d g) where
   show (Var {v = v} x) = show (toFin x) ++ v
@@ -51,8 +54,10 @@ instance Show (Scoped d g) where
   show (x :$ y) = show x ++ " " ++ show y
   show (If b t f) = "if " ++ show b ++ " then " ++ show t ++ " else " ++ show f
   show (Tuple xs) = "(" ++ sepConcat ", " (map show xs) ++ ")"
+  show (Variant i s) = "variant " ++ show i ++ " " ++ show s
+  show (s `As` ty) = "(" ++ show s ++ " : " ++ show ty ++ ")"
 
-total strip : Term d gty t -> Syn d
+strip : Term d gty t -> Syn d
 strip (Bool x) = Bool x
 strip (Num x) = Num x
 strip (Var v _) = Var v
@@ -60,6 +65,7 @@ strip (Lam v {b = b} x) = Lam v b (strip x)
 strip (x :$ y) = strip x :$ strip y
 strip (If b t f) = If (strip b) (strip t) (strip f)
 strip (Tuple xs) = Tuple (mapToVect strip xs)
+strip (Variant {as = as} i tm) = Variant (finToNat (toFin i)) (strip tm) `As` Sum as
 strip _ = Var "output for this thing is not implemented"
 
 instance Show (Term d gty t) where
@@ -70,3 +76,4 @@ instance Show (Val t) where
   show (Num x) = show x
   show (Cls {a = a} v p x) = "\\" ++ v ++ ": " ++ show a ++ ". " ++ show (strip x)
   show (Tuple xs) = "(" ++ sepConcat ", " (mapToVect (\x => show x) xs) ++ ")"
+  show (Variant {as = as} _ x) = "(" ++ show x ++ " : (" ++ sepConcat ", " (map show as) ++ "))"

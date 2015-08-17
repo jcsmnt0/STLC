@@ -60,10 +60,13 @@ parseIdent = pack <$> guard isValid (many1 (match isIdentChar <|> match isDigit)
     isValid [] = False -- can't happen because of many1
     isValid (x :: _) = not (isDigit x)
 
-parseTy : StringParser SynParseError Ty
+TyParser : Type
+TyParser = StringParser SynParseError Ty
+
+parseTy : TyParser
 parseTy = parseFunTy <|> parseParenTy <|> parseBaseTy
   where
-    parseBaseTy : StringParser SynParseError Ty
+    parseBaseTy : TyParser
     parseBaseTy = do
       ty <- many (match isLowercaseLetter <|> match isUppercaseLetter)
       case pack ty of
@@ -71,18 +74,18 @@ parseTy = parseFunTy <|> parseParenTy <|> parseBaseTy
         "Bool" => return Bool
         ty' => failWith (TyError ty')
 
-    parseParenTy : StringParser SynParseError Ty
+    parseParenTy : TyParser
     parseParenTy = do
       exactly '(' *> spaces
       parseTupleTy <|> parseSumTy <|> (parseTy <* spaces <* exactly ')')
     where
-      parseTupleTy : StringParser SynParseError Ty
+      parseTupleTy : TyParser
       parseTupleTy = (Tuple $$) . toVect <$> (sep1 (exactly ',' *> spaces) parseTy <* spaces <* exactly ')')
 
-      parseSumTy : StringParser SynParseError Ty
-      parseSumTy = (Tuple $$) . toVect <$> sep1 (spaces *> exactly '|' <* spaces) parseTy <* spaces <* exactly ')'
+      parseSumTy : TyParser
+      parseSumTy = (Sum $$) . toVect <$> sep1 (spaces *> exactly '|' <* spaces) parseTy <* spaces <* exactly ')'
 
-    parseFunTy : StringParser SynParseError Ty
+    parseFunTy : TyParser
     parseFunTy = do
       a <- parseBaseTy <|> parseParenTy
       let separator = spaces *> roughly "->" *> spaces
@@ -108,9 +111,19 @@ liftExSyns ss = liftSyns (unzip ss)
 E0 : b Z -> Ex b
 E0 = E
 
+parseNat : StringParser SynParseError Nat
+parseNat = do
+  xs <- many1 (match isDigit)
+  return (cast {to = Nat} $ cast {to = Int} $ pack xs)
+
+parseFloat : StringParser SynParseError Float
+parseFloat = do
+  xs <- many1 (match isDigit)
+  return (cast {to = Float} $ pack xs)
+
 mutual
   parseSyn : SynParser
-  parseSyn = parseApp <|> parseParenSyn <|> parseLam <|> parseNat <|> parseKeyword <|> parseVar
+  parseSyn = choice [parseAs, parseVariant, parseApp, parseParenSyn, parseLam, parseNum, parseKeyword, parseVar]
 
   parseVar : SynParser
   parseVar = E0 . Var <$> guard (\ident => not (elem ident keywords)) parseIdent
@@ -131,10 +144,17 @@ mutual
         return (E $ If b' t' f')
       ident => failWith (IdentError ident)
 
-  parseNat : SynParser
-  parseNat = do
-    xs <- many1 (match isDigit)
-    return (E0 $ Num (cast {to = Float} (pack xs)))
+  parseAs : SynParser
+  parseAs = do
+    E t <- choice [parseVariant, parseApp, parseParenSyn, parseLam, parseNum, parseKeyword, parseVar]
+    spaces *> exactly ':' *> spaces
+    ty <- parseTy
+    return (E $ t `As` ty)
+
+  parseNum : SynParser
+  parseNum = do
+    x <- parseFloat
+    return (E0 $ Num x)
 
   parseLam : SynParser
   parseLam = do
@@ -145,6 +165,14 @@ mutual
     exactly '.' *> spaces
     E expr <- parseSyn
     return (E $ Lam var ty expr)
+
+  parseVariant : SynParser
+  parseVariant = do
+    roughly "variant" *> spaces1
+    i <- parseNat
+    spaces1
+    E s <- choice [parseVariant, parseApp, parseParenSyn, parseLam, parseNum, parseKeyword, parseVar]
+    return (E $ Variant i s)
 
   parseParenSyn : SynParser
   parseParenSyn = do
@@ -171,7 +199,7 @@ mutual
     return (E $ foldApp (liftExSyns (x :: xs)))
   where
     parseArg : SynParser
-    parseArg = parseParenSyn <|> parseLam <|> parseNat <|> parseKeyword <|> parseVar
+    parseArg = choice [parseVariant, parseParenSyn, parseLam, parseNum, parseKeyword, parseVar]
 
     foldApp : Vect (S n) (Syn d) -> Syn (n + d)
     foldApp [s] = s

@@ -1,5 +1,7 @@
 module Parser
 
+import Data.Vect
+
 import Util.Either
 
 %default total
@@ -60,6 +62,9 @@ instance Applicative (Parser e i) where
 
 (<|>) : Parser e i o -> Parser e i o -> Parser e i o
 f <|> g = MkParser $ \i => runParser f i <|> runParser g i
+
+choice : Vect (S n) (Parser e i o) -> Parser e i o
+choice ps = foldl1 Parser.(<|>) ps
 
 instance Monad (Parser e i) where
   g >>= f = MkParser $ \i => do

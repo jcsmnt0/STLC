@@ -5,6 +5,8 @@ import Data.Vect
 
 import Util.Dec
 
+%default total
+
 toFin : {xs : Vect n a} -> Elem x xs -> Fin n
 toFin Here = FZ
 toFin (There i) = FS (toFin i)
