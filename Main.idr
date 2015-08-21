@@ -25,9 +25,9 @@ rep = do
   if src == "exit"
      then return ()
      else
-       case runParser parseSyn (unpack src) of
+       case runParser parseSyn src of
          Left err => putStrLn ("bad syntax: " ++ show err)
-         Right (MkResult (E s) rest _) =>
+         Right (MkResult (E s) rest) =>
              case scopecheck builtinNames s of
                Left err => putStrLn ("bad scope: " ++ show err)
                Right db =>

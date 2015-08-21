@@ -2,151 +2,182 @@ module Parser
 
 import Data.Vect
 
-import Util.Either
-
-%default total
 %access public
 
-data Suffix : List a -> List a -> Type where
-  Nil : Suffix xs xs
-  (::) : (x : a) -> Suffix ys xs -> Suffix ys (x :: xs)
+%default partial
 
-(++) : Suffix ys xs -> Suffix zs ys -> Suffix zs xs
-(++) [] sf' = sf'
-(++) (x :: sf) sf' = x :: (sf ++ sf')
+-- resolution only works if I specify that it's not dependent on e - why?
+class Sequence s e | s where
+  cons : e -> s -> s
+  uncons : s -> Maybe (e, s)
 
-data Result : List a -> Type -> Type -> Type where
-  MkResult : o -> (ys : List i) -> Suffix ys xs -> Result xs i o
+instance Sequence (List a) a where
+  cons = (::)
+  uncons [] = Nothing
+  uncons (x :: xs) = Just (x, xs)
 
-instance Functor (Result xs i) where
-  map f (MkResult x ys sf) = MkResult (f x) ys sf
+instance Sequence String Char where
+  cons = strCons
+  uncons "" = Nothing
+  uncons str = Just (assert_total (strHead str), assert_total (strTail str))
 
-output : Result xs i o -> o
-output (MkResult x _ _) = x
 
-data Parser : Type -> Type -> Type -> Type where
-  MkParser : ((xs : List i) -> Either e (Result xs i o)) -> Parser e i o
+%default total
 
-record ParseError where
-  constructor Err
-  message : String
+data Result : Type -> Type -> Type where
+  MkResult : o -> s -> Result s o
 
-instance Show ParseError where
-  show = message
+instance Show o => Show (Result s o) where
+  show (MkResult x _) = show x
 
-runParser : Parser e i o -> (xs : List i) -> Either e (Result xs i o)
+instance Functor (Result i) where
+  map f (MkResult x sf) = MkResult (f x) sf
+
+output : Result i o -> o
+output (MkResult x _) = x
+
+data Parser : Type -> Type -> Type -> Type -> Type where
+  MkParser : Sequence s i => (s -> Either e (Result s o)) -> Parser e s i o
+
+class ParseError e where
+  fromString : String -> e
+
+instance ParseError String where
+  fromString = id
+
+runParser : Parser e s i o -> s -> Either e (Result s o)
 runParser (MkParser f) = f
 
-execParser : Parser e i o -> List i -> Either e o
+execParser : Parser e s i o -> s -> Either e o
 execParser f xs = map output (runParser f xs)
 
-instance Semigroup o => Semigroup (Parser e i o) where
+instance (Sequence s i, Semigroup o) => Semigroup (Parser e s i o) where
   p <+> q = MkParser $ \i => do
-    MkResult op i' sfp <- runParser p i
-    MkResult oq i'' sfq <- runParser q i'
-    return (MkResult (op <+> oq) i'' (sfp ++ sfq))
+    MkResult op i' <- runParser p i
+    MkResult oq i'' <- runParser q i'
+    return (MkResult (op <+> oq) i'')
 
-instance Monoid o => Monoid (Parser e i o) where
-  neutral = MkParser $ \i => Right (MkResult neutral i [])
+instance (Sequence s i, Monoid o) => Monoid (Parser e s i o) where
+  neutral = MkParser $ \i => Right (MkResult neutral i)
 
-instance Functor (Parser e i) where
+instance Sequence s i => Functor (Parser e s i) where
   map f (MkParser g) = MkParser $ \i => map f <$> g i
 
-instance Applicative (Parser e i) where
-  pure x = MkParser $ \i => Right (MkResult x i [])
+instance Sequence s i => Applicative (Parser e s i) where
+  pure x = MkParser $ \i => Right (MkResult x i)
 
   p <*> q = MkParser $ \i => do
-    MkResult op i' sfp <- runParser p i
-    MkResult oq i'' sfq <- runParser q i'
-    return (MkResult (op oq) i'' (sfp ++ sfq))
+    MkResult op i' <- runParser p i
+    MkResult oq i'' <- runParser q i'
+    return (MkResult (op oq) i'')
 
-(<|>) : Parser e i o -> Parser e i o -> Parser e i o
-f <|> g = MkParser $ \i => runParser f i <|> runParser g i
+failWith : Sequence s i => e -> Parser e s i o
+failWith err = MkParser (const (Left err))
 
-choice : Vect (S n) (Parser e i o) -> Parser e i o
-choice ps = foldl1 Parser.(<|>) ps
+private throw : (Sequence s i, ParseError e) => String -> Parser e s i o
+throw = failWith . fromString
 
-instance Monad (Parser e i) where
+instance (Sequence s i, ParseError e) => Alternative (Parser e s i) where
+  empty = throw "empty"
+  f <|> g = MkParser $ \i =>
+    case runParser f i of
+      Left err => runParser g i
+      Right result => return result
+
+choice : (Sequence s i, ParseError e) => Vect (S n) (Parser e s i o) -> Parser e s i o
+choice ps = foldl1 (<|>) ps
+
+instance Sequence s i => Monad (Parser e s i) where
   g >>= f = MkParser $ \i => do
-    MkResult o i' sf <- runParser g i
-    MkResult o' i'' sf' <- runParser (f o) i'
-    return (MkResult o' i'' (sf ++ sf'))
+    MkResult o i' <- runParser g i
+    MkResult o' i'' <- runParser (f o) i'
+    return (MkResult o' i'')
 
-failWith : e -> Parser e i o
-failWith err = MkParser $ \_ => Left err
-
-private err : Cast ParseError e => String -> e
-err = cast . Err
-
-private throw : Cast ParseError e => String -> Parser e i o
-throw = failWith . err
-
-noop : Monoid o => Parser e i o
+noop : (Sequence s i, Monoid o) => Parser e s i o
 noop = neutral
 
-maybe : Parser e i o -> Parser e i (Maybe o)
+maybe : (Sequence s i, ParseError e) => Parser e s i o -> Parser e s i (Maybe o)
 maybe p = MkParser $ \i =>
   case runParser p i of
-    Right (MkResult o i' sf) => Right (MkResult (Just o) i' sf)
-    Left _ => Right (MkResult Nothing i [])
+    Right (MkResult o i') => Right (MkResult (Just o) i')
+    Left _ => Right (MkResult Nothing i)
 
-matchMap : Cast ParseError e => (i -> Maybe o) -> Parser e i o
-matchMap f = MkParser $ \i =>
-  case i of
-    [] => Left (err "matchMap failed: no input")
-    (x :: xs) =>
+matchMap : (Sequence s i, ParseError e) => (i -> Maybe o) -> Parser e s i o
+matchMap f = MkParser $ \i => 
+  case uncons i of
+    Nothing => Left (fromString "matchMap failed: no input")
+    Just (x, xs) =>
       case f x of
-        Nothing => Left (err "matchMap failed: bad input")
-        Just x' => Right (MkResult x' xs [x])
+        Nothing => Left (fromString "matchMap failed: bad input")
+        Just x => Right (MkResult x xs)
 
-match : Cast ParseError e => (i -> Bool) -> Parser e i i
+match : (Sequence s i, ParseError e) => (i -> Bool) -> Parser e s i i
 match f = matchMap (\x => if f x then Just x else Nothing) <|> throw "match failed"
 
-exactly : (Cast ParseError e, Eq i) => i -> Parser e i i
-exactly x = match (== x) <|> failWith (err "exactly failed")
+token : (Sequence s i, ParseError e, Eq i) => i -> Parser e s i i
+token x = match (== x) <|> throw "token failed"
 
-exactlyList : (Cast ParseError e, Eq i) => List i -> Parser e i (List i)
-exactlyList [] = noop
-exactlyList (x :: xs) = [| exactly x :: exactlyList xs |] <|> throw "exactlyList failed"
+covering string : (Sequence s i, Monoid s, ParseError e, Eq i) => s -> Parser e s i s
+string s =
+  case uncons s of
+    Nothing => noop
+    Just (x, xs) => [| cons (token x) (string xs) |] <|> throw "string failed"
 
-roughly : (Cast ParseError e, Cast a (List i), Eq i) => a -> Parser e i (List i)
-roughly = exactlyList . cast
-
-ignore : Parser e i o -> Parser e i ()
+ignore : Sequence s i => Parser e s i o -> Parser e s i ()
 ignore = map (const ())
 
-partial many : Parser e i o -> Parser e i (List o)
+covering many : (Sequence s i, ParseError e) => Parser e s i o -> Parser e s i (List o)
 many p = do
   x <- maybe p
   case x of
     Nothing => return []
     Just x' => return (x' :: !(many p))
 
-guard : Cast ParseError e => (o -> Bool) -> Parser e i o -> Parser e i o
+covering many' : (Sequence s i, ParseError e) => Parser e s i o -> Parser e s i ()
+many' p = do
+  x <- maybe p
+  case x of
+    Nothing => return ()
+    Just _ => many' p
+
+guard : (Sequence s i, ParseError e) => (o -> Bool) -> Parser e s i o -> Parser e s i o
 guard f p = do
   x <- p
   if f x then return x else throw "guard failed"
 
-iff : Cast ParseError e => Parser e i o -> (o -> Bool) -> Parser e i o
+iff : (Sequence s i, ParseError e) => Parser e s i o -> (o -> Bool) -> Parser e s i o
 iff = flip guard
 
-partial many1 : Cast ParseError e => Parser e i i -> Parser e i (List i)
-many1 = guard (isSucc . length) . many
+covering many1 : (Sequence s i, ParseError e) => Parser e s i i -> Parser e s i (List i)
+many1 p = guard (isSucc . length) (many p) <|> throw "many1 failed"
 
-partial sep1 : Parser e i a -> Parser e i b -> Parser e i (List b)
-sep1 p q = [| q :: many (p *> q) |]
+covering sep1 :
+  (Sequence s i, ParseError e) =>
+  Parser e s i a ->
+  Parser e s i b ->
+  Parser e s i (List b)
+sep1 p q = [| q :: many (p *> q) |] <|> throw "sep1 failed"
 
-partial sepBy1 : Parser e i a -> Parser e i b -> Parser e i (List a)
-sepBy1 = flip sep1
+covering sepBy1 :
+  (Sequence s i, ParseError e) =>
+  Parser e s i a ->
+  Parser e s i b ->
+  Parser e s i (List a)
+sepBy1 p q = sep1 q p <|> throw "sepBy1 failed"
 
-between : Parser e i a -> Parser e i b -> Parser e i c -> Parser e i c
-between p r q = p *> q <* r
+between :
+  (Sequence s i, ParseError e) =>
+  Parser e s i a ->
+  Parser e s i b ->
+  Parser e s i c ->
+  Parser e s i c
+between p r q = (p *> q <* r) <|> throw "between failed"
 
-StringParser : Type -> Type -> Type
-StringParser e = Parser e Char
-
-partial spaces : Cast ParseError e => StringParser e (List Char)
+covering spaces : (Sequence s Char, ParseError e) => Parser e s Char (List Char)
 spaces = many (match isSpace)
 
-partial spaces1 : Cast ParseError e => StringParser e (List Char)
-spaces1 = many1 (match isSpace)
+covering spaces1 : (Sequence s Char, ParseError e) => Parser e s Char (List Char)
+spaces1 = many1 (match isSpace) <|> throw "spaces1 failed"
+
+StringParser : Type -> Type
+StringParser = Parser String String Char

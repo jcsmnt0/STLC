@@ -15,7 +15,7 @@ import Util.Vect
 %default total
 
 data SynParseError
-  = ParseError ParseError
+  = ParseError String
   | TyError String
   | IdentError String
 
@@ -24,11 +24,17 @@ instance Show SynParseError where
   show (TyError ty) = ty ++ " is not a valid type"
   show (IdentError ident) = ident ++ " is not a valid identifier"
 
-instance Cast ParseError SynParseError where
-  cast = ParseError
+instance ParseError SynParseError where
+  fromString = ParseError
+
+Parser' : Type -> Type
+Parser' = Parser SynParseError String Char
 
 SynParser : Type
-SynParser = StringParser SynParseError (Ex Syn)
+SynParser = Parser' (Ex Syn)
+
+TyParser : Type
+TyParser = Parser' Ty
 
 isLowercaseLetter : Char -> Bool
 isLowercaseLetter c = 'a' <= c && c <= 'z'
@@ -53,15 +59,12 @@ keywords =
 
 %default partial
 
-parseIdent : StringParser SynParseError String
+parseIdent : Parser' String
 parseIdent = pack <$> guard isValid (many1 (match isIdentChar <|> match isDigit))
   where
     isValid : List Char -> Bool
     isValid [] = False -- can't happen because of many1
     isValid (x :: _) = not (isDigit x)
-
-TyParser : Type
-TyParser = StringParser SynParseError Ty
 
 parseTy : TyParser
 parseTy = parseFunTy <|> parseParenTy <|> parseBaseTy
@@ -76,24 +79,24 @@ parseTy = parseFunTy <|> parseParenTy <|> parseBaseTy
 
     parseParenTy : TyParser
     parseParenTy = do
-      exactly '(' *> spaces
-      parseTupleTy <|> parseSumTy <|> (parseTy <* spaces <* exactly ')')
+      token '(' *> spaces
+      parseTupleTy <|> parseSumTy <|> (parseTy <* spaces <* token ')')
     where
       parseTupleTy : TyParser
       parseTupleTy = do
-        -- Tuple . toVect <$> (sep1 (exactly ',' *> spaces) parseTy <* spaces <* exactly ')')
-        xs <- sep1 (spaces *> exactly ',' *> spaces) parseTy <* spaces <* exactly ')'
+        -- Tuple . toVect <$> (sep1 (token ',' *> spaces) parseTy <* spaces <* token ')')
+        xs <- sep1 (spaces *> token ',' *> spaces) parseTy <* spaces <* token ')'
         return (Tuple (toVect xs))
 
       parseSumTy : TyParser
       parseSumTy = do
-        xs <- sep1 (spaces *> exactly '|' *> spaces) parseTy <* spaces <* exactly ')'
+        xs <- sep1 (spaces *> token '|' *> spaces) parseTy <* spaces <* token ')'
         return (Sum (toVect xs))
 
     parseFunTy : TyParser
     parseFunTy = do
       a <- parseBaseTy <|> parseParenTy
-      let separator = spaces *> roughly "->" *> spaces
+      let separator = spaces *> string "->" *> spaces
       as <- separator *> sep1 separator parseTy
       return (foldl (:->) a as)
 
@@ -116,12 +119,12 @@ liftExSyns ss = liftSyns (unzip ss)
 E0 : b Z -> Ex b
 E0 = E
 
-parseNat : StringParser SynParseError Nat
+parseNat : Parser' Nat
 parseNat = do
   xs <- many1 (match isDigit)
   return (cast {to = Nat} $ cast {to = Int} $ pack xs)
 
-parseFloat : StringParser SynParseError Float
+parseFloat : Parser' Float
 parseFloat = do
   xs <- many1 (match isDigit)
   return (cast {to = Float} $ pack xs)
@@ -141,9 +144,9 @@ mutual
       "if" => do
         spaces
         b <- parseSyn
-        spaces1 *> roughly "then" *> spaces1
+        spaces1 *> string "then" *> spaces1
         t <- parseSyn
-        spaces1 *> roughly "else" *> spaces1
+        spaces1 *> string "else" *> spaces1
         f <- parseSyn
         let [b', t', f'] = liftExSyns [b, t, f]
         return (E $ If b' t' f')
@@ -152,7 +155,7 @@ mutual
   parseAs : SynParser
   parseAs = do
     E t <- choice [parseVariant, parseApp, parseParenSyn, parseLam, parseNum, parseKeyword, parseVar]
-    spaces *> exactly ':' *> spaces
+    spaces *> token ':' *> spaces
     ty <- parseTy
     return (E $ t `As` ty)
 
@@ -163,17 +166,17 @@ mutual
 
   parseLam : SynParser
   parseLam = do
-    exactly '\\' *> spaces
+    token '\\' *> spaces
     var <- parseIdent
-    spaces *> exactly ':' *> spaces
+    spaces *> token ':' *> spaces
     ty <- parseTy
-    exactly '.' *> spaces
+    token '.' *> spaces
     E expr <- parseSyn
     return (E $ Lam var ty expr)
 
   parseVariant : SynParser
   parseVariant = do
-    roughly "variant" *> spaces1
+    string "variant" *> spaces1
     i <- parseNat
     spaces1
     E s <- choice [parseVariant, parseApp, parseParenSyn, parseLam, parseNum, parseKeyword, parseVar]
@@ -181,20 +184,20 @@ mutual
 
   parseParenSyn : SynParser
   parseParenSyn = do
-    exactly '(' *> spaces
+    token '(' *> spaces
     expr <- parseSyn
     parseTuple expr <|> parseEndParen expr
   where
     parseEndParen : Ex Syn -> SynParser
     parseEndParen expr = do
-      spaces *> exactly ')'
+      spaces *> token ')'
       return expr
 
     parseTuple : Ex Syn -> SynParser
     parseTuple x = do
-      let separator = spaces *> exactly ',' *> spaces
+      let separator = spaces *> token ',' *> spaces
       xs <- separator *> sep1 separator parseSyn
-      exactly ')'
+      token ')'
       return (E $ Tuple (liftExSyns (x :: toVect xs)))
 
   parseApp : SynParser
