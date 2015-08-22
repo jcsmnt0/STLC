@@ -22,10 +22,10 @@ import Util.Monad
 eval : String -> Either String (d ** (ty ** Term d builtinTys ty))
 eval src = 
  case runParser parseSyn src of
-   Left err => Left ("bad syntax: " ++ show err)
+   Left err => Left ("bad syntax: " ++ err)
    Right (MkResult (E s) rest) =>
        case scopecheck builtinNames s of
-         Left err => Left ("bad scope: " ++ show err)
+         Left err => Left ("bad scope: " ++ err)
          Right db =>
            case typecheck builtinTys db of
              Nothing => Left ("bad types: " ++ show db)

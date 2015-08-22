@@ -14,27 +14,11 @@ import Util.Vect
 
 %default total
 
-data SynParseError
-  = ParseError String
-  | TyError String
-  | IdentError String
-
-instance Show SynParseError where
-  show (ParseError p) = show p
-  show (TyError ty) = ty ++ " is not a valid type"
-  show (IdentError ident) = ident ++ " is not a valid identifier"
-
-instance ParseError SynParseError where
-  fromString = ParseError
-
-Parser' : Type -> Type
-Parser' = Parser SynParseError String Char
-
 SynParser : Type
-SynParser = Parser' (Ex Syn)
+SynParser = StringParser (Ex Syn)
 
 TyParser : Type
-TyParser = Parser' Ty
+TyParser = StringParser Ty
 
 isLowercaseLetter : Char -> Bool
 isLowercaseLetter c = 'a' <= c && c <= 'z'
@@ -59,7 +43,7 @@ keywords =
 
 %default partial
 
-parseIdent : Parser' String
+parseIdent : StringParser String
 parseIdent = pack <$> guard isValid (many1 (match isIdentChar <|> match isDigit))
   where
     isValid : List Char -> Bool
@@ -75,7 +59,7 @@ parseTy = parseFunTy <|> parseParenTy <|> parseBaseTy
       case pack ty of
         "Num" => return Num
         "Bool" => return Bool
-        ty' => failWith (TyError ty')
+        ty' => failWith (pack ty ++ " isn't a valid type")
 
     parseParenTy : TyParser
     parseParenTy = do
@@ -119,12 +103,12 @@ liftExSyns ss = liftSyns (unzip ss)
 E0 : b Z -> Ex b
 E0 = E
 
-parseNat : Parser' Nat
+parseNat : StringParser Nat
 parseNat = do
   xs <- many1 (match isDigit)
   return (cast {to = Nat} $ cast {to = Int} $ pack xs)
 
-parseFloat : Parser' Float
+parseFloat : StringParser Float
 parseFloat = do
   xs <- many1 (match isDigit)
   return (cast {to = Float} $ pack xs)
@@ -150,7 +134,7 @@ mutual
         f <- parseSyn
         let [b', t', f'] = liftExSyns [b, t, f]
         return (E $ If b' t' f')
-      ident => failWith (IdentError ident)
+      ident => failWith (ident ++ " isn't a valid identifier")
 
   parseAs : SynParser
   parseAs = do
