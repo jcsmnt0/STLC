@@ -7,3 +7,7 @@ module Either
 mapLeft : (a -> b) -> Either a c -> Either b c
 mapLeft f (Left x) = Left (f x)
 mapLeft _ (Right y) = Right y
+
+collapse : Either a a -> a
+collapse (Left x) = x
+collapse (Right x) = x

@@ -4,17 +4,13 @@ import Data.Vect
 
 %access public
 
+
 %default partial
 
 -- resolution only works if I specify that it's not dependent on e - why?
 class Sequence s e | s where
   cons : e -> s -> s
   uncons : s -> Maybe (e, s)
-
-instance Sequence (List a) a where
-  cons = (::)
-  uncons [] = Nothing
-  uncons (x :: xs) = Just (x, xs)
 
 instance Sequence String Char where
   cons = strCons
@@ -23,6 +19,11 @@ instance Sequence String Char where
 
 
 %default total
+
+instance Sequence (List a) a where
+  cons = (::)
+  uncons [] = Nothing
+  uncons (x :: xs) = Just (x, xs)
 
 data Result : Type -> Type -> Type where
   MkResult : o -> s -> Result s o
@@ -74,8 +75,17 @@ instance Sequence s i => Applicative (Parser e s i) where
 failWith : Sequence s i => e -> Parser e s i o
 failWith err = MkParser (const (Left err))
 
+propagate : (Sequence s i, ParseError e, ParseError e') => (e -> e') -> Parser e s i o -> Parser e' s i o
+propagate f p = MkParser $ \i =>
+  case runParser p i of
+    Left err => Left (f err)
+    Right x => Right x
+
 private throw : (Sequence s i, ParseError e) => String -> Parser e s i o
 throw = failWith . fromString
+
+private rethrow : (Sequence s i, ParseError e, Semigroup e) => String -> Parser e s i o -> Parser e s i o
+rethrow x = propagate ((fromString x) <+>)
 
 instance (Sequence s i, ParseError e) => Alternative (Parser e s i) where
   empty = throw "empty"
@@ -148,35 +158,35 @@ guard f p = do
 iff : (Sequence s i, ParseError e) => Parser e s i o -> (o -> Bool) -> Parser e s i o
 iff = flip guard
 
-covering many1 : (Sequence s i, ParseError e) => Parser e s i i -> Parser e s i (List i)
-many1 p = guard (isSucc . length) (many p) <|> throw "many1 failed"
+covering many1 : (Sequence s i, ParseError e, Semigroup e) => Parser e s i o -> Parser e s i (List o)
+many1 p = rethrow "many1: " $ guard (isSucc . length) (many p)
 
 covering sep1 :
-  (Sequence s i, ParseError e) =>
+  (Sequence s i, ParseError e, Semigroup e) =>
   Parser e s i a ->
   Parser e s i b ->
   Parser e s i (List b)
-sep1 p q = [| q :: many (p *> q) |] <|> throw "sep1 failed"
+sep1 p q = rethrow "sep1: " [| q :: many (p *> q) |]
 
 covering sepBy1 :
-  (Sequence s i, ParseError e) =>
+  (Sequence s i, ParseError e, Semigroup e) =>
   Parser e s i a ->
   Parser e s i b ->
   Parser e s i (List a)
-sepBy1 p q = sep1 q p <|> throw "sepBy1 failed"
+sepBy1 p q = rethrow "sepBy1: " (sep1 q p)
 
 between :
-  (Sequence s i, ParseError e) =>
+  (Sequence s i, ParseError e, Semigroup e) =>
   Parser e s i a ->
   Parser e s i b ->
   Parser e s i c ->
   Parser e s i c
-between p r q = (p *> q <* r) <|> throw "between failed"
+between p r q = rethrow "between: " (p *> q <* r)
 
 covering spaces : (Sequence s Char, ParseError e) => Parser e s Char (List Char)
 spaces = many (match isSpace)
 
-covering spaces1 : (Sequence s Char, ParseError e) => Parser e s Char (List Char)
+covering spaces1 : (Sequence s Char, ParseError e, Semigroup e) => Parser e s Char (List Char)
 spaces1 = many1 (match isSpace) <|> throw "spaces1 failed"
 
 StringParser : Type -> Type

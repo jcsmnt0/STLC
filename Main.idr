@@ -20,26 +20,19 @@ import Util.Monad
 
 %default partial
 
-eval : String -> Either String (d ** (ty ** Term d builtinTys ty))
+eval : String -> Either String String
 eval src =  do
   MkResult (E s) rest <- runParser parseSyn src
   db <- scopecheck builtinNames s
-  E tm <- mapLeft show (typecheck builtinTys db)
-  return (_ ** (_ ** tm))
+  E {x = ty} tm <- mapLeft show (typecheck builtinTys db)
+  return $ "\n" ++ show tm ++ " : " ++ show ty ++ "\n=>\n" ++ show (impatience (eval builtinVals tm))
 
 rep : IO Bool
 rep = do
   src <- getLine
   if src == "exit"
      then return True
-     else
-       case eval src of
-         Left err => putStrLn err *> return False
-         Right (_ ** (ty ** tm)) => do
-           putStrLn ("\n" ++ show tm ++ " : " ++ show ty)
-           putStrLn "=>"
-           putStrLn (show (impatience (eval builtinVals tm)))
-           return False
+     else putStrLn (collapse (eval src)) *> return False
 
 main : IO ()
 main = putStrLn "hello\n" *> until id (rep <* putStrLn "") *> return ()
