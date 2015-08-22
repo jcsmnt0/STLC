@@ -77,3 +77,11 @@ instance Show (Val t) where
   show (Cls {a = a} v p x) = "\\" ++ v ++ ": " ++ show a ++ ". " ++ show (strip x)
   show (Tuple xs) = "(" ++ sepConcat ", " (mapToVect (\x => show x) xs) ++ ")"
   show (Variant {as = as} _ x) = "(" ++ show x ++ " : (" ++ sepConcat ", " (map show as) ++ "))"
+
+instance Show TypeError where
+  show err = "type error: " ++
+    case err of
+      App => "app"
+      If => "if"
+      Variant => "variant"
+      As s ty ty' => show s ++ " is of type " ++ show ty' ++ " but should be of type " ++ show ty

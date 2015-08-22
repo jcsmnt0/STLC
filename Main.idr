@@ -14,22 +14,18 @@ import Term
 import Ty
 import Typecheck
 
+import Util.Either
 import Util.Ex
 import Util.Monad
 
 %default partial
 
 eval : String -> Either String (d ** (ty ** Term d builtinTys ty))
-eval src = 
- case runParser parseSyn src of
-   Left err => Left ("bad syntax: " ++ err)
-   Right (MkResult (E s) rest) =>
-       case scopecheck builtinNames s of
-         Left err => Left ("bad scope: " ++ err)
-         Right db =>
-           case typecheck builtinTys db of
-             Nothing => Left ("bad types: " ++ show db)
-             Just (E tm) => Right (_ ** (_ ** tm))
+eval src =  do
+  MkResult (E s) rest <- runParser parseSyn src
+  db <- scopecheck builtinNames s
+  E tm <- mapLeft show (typecheck builtinTys db)
+  return (_ ** (_ ** tm))
 
 rep : IO Bool
 rep = do
