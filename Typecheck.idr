@@ -19,6 +19,7 @@ data TypeError
   = App
   | If
   | Variant
+  | LamRec
   | As (Scoped d gv) Ty Ty
   | Fix
   | CantInfer
@@ -38,9 +39,15 @@ typecheck gty (Num n) =
 typecheck gty (Bool b) =
   return (E $ Bool b)
 
-typecheck gty (Lam {v = v} t scx) = do
-  E tmx <- typecheck (t :: gty) scx
-  return (E $ Lam v tmx)
+typecheck gty (LamRec {vf = vf} {v = v} a b sc) with (typecheck ((a :-> b) :: a :: gty) sc)
+  typecheck gty (LamRec {vf = vf} {v = v} a b sc) | Right (E {x = b'} tm) with (b =? b')
+    typecheck gty (LamRec {vf = vf} {v = v} a b sc) | Right (E {x = b} tm) | Yes Refl = Right (E $ LamRec vf v tm)
+    typecheck gty (LamRec {vf = vf} {v = v} a b sc) | Right (E {x = b'} tm) | No _ = Left LamRec
+  typecheck gty (LamRec {vf = vf} {v = v} a b sc) | Left err = Left LamRec
+
+typecheck gty (Lam {v = v} a sc) = do
+  E tm <- typecheck (a :: gty) sc
+  return (E $ Lam v tm)
 
 typecheck gty (scx :$ scy) with (typecheck gty scx, typecheck gty scy)
   typecheck _ _ | (Right (E {x = a :-> b} tmx), Right (E {x = c} tmy)) with (a =? c)
@@ -58,7 +65,10 @@ typecheck gty (Tuple scs) = do
   tms <- sequence (map (typecheck gty) scs)
   return (E $ Tuple (unzip tms))
 
--- also: typecheck gty (s `As` Sum tys) fallthrough for inference!
+typecheck gty (Variant i s) =
+  Left Variant -- has to be wrapped in an As
+
+-- also: typecheck gty (s `As` Sum tys) for inference!
 typecheck gty (Variant i s `As` Sum {n = n} tys) with (typecheck gty s, natToFin i n)
   typecheck _ (Variant i s `As` Sum {n = n} tys) | (Right (E {x = ty} tm), Just i') with (ty =? index i' tys)
     typecheck _ (Variant i s `As` Sum {n = n} tys) | (Right (E tm), Just i') | Yes Refl =
@@ -71,12 +81,3 @@ typecheck gty (s `As` ty) = do
   case ty =? ty' of
     Yes _ => Right (E tm)
     No _ => Left (As s ty ty')
-
-typecheck gty (Fix ty s) with (typecheck (ty :: gty) s)
-  typecheck gty (Fix ty s) | (Right (E {x = ty'} tm)) with (ty =? ty')
-    typecheck gty (Fix ty s) | (Right (E {x = ty} tm)) | Yes Refl = return (E $ Fix tm)
-    typecheck _ _ | _ | No _ = Left Fix
-  typecheck _ _ | _ = Left Fix
-
-typecheck gty (Variant i s) =
-  Left Variant -- has to be wrapped in an As

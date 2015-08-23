@@ -62,9 +62,11 @@ namespace Term
       Term d (b :: g) a ->
       Term (S d) g (b :-> a)
 
-    Fix :
-      Term d (a :: g) a ->
-      Term (S d) g a
+    LamRec :
+      String ->
+      String ->
+      Term d ((b :-> a) :: b :: g) a ->
+      Term (S d) g (b :-> a)
 
     (:$) :
       Term d g (b :-> a) ->
@@ -101,6 +103,13 @@ namespace Val
       PiVect Val g ->
       Term d (a :: g) b ->
       Val (a :-> b)
+    
+    ClsRec :
+      String ->
+      String ->
+      PiVect Val g ->
+      Term d ((a :-> b) :: a :: g) b ->
+      Val (a :-> b)
 
 mutual
   -- I think at least some of these assert_totals go away if Ty is tagged with its depth
@@ -114,6 +123,7 @@ mutual
     let Inj p x = assert_total (reflect (Variant p t)) in
       Inj (There p) x
   reflect {a = a :-> b} (Cls v p tm) = \x => reflect <$> eval (unreflect x :: p) tm
+  reflect {a = a :-> b} cls@(ClsRec f v p tm) = \x => reflect <$> Later (eval (cls :: unreflect x :: p) tm)
 
   unreflect : toType a -> Val a
   unreflect {a = Bool} x = Bool x
@@ -166,8 +176,8 @@ mutual
   eval p (Lam v t) =
     Now (Cls v p t)
 
-  eval p (Fix t) =
-    Later (eval p (Lam "fix" t :$ Fix t))
+  eval p (LamRec vf v t) =
+    Now (ClsRec vf v p t)
 
   eval p (If b t f) = do
     Bool b' <- eval p b
@@ -177,4 +187,5 @@ mutual
     evalApp !(eval p s) !(eval p t)
     where
       evalApp : Val (a :-> b) -> Val a -> Partial (Val b)
-      evalApp (Cls _ p t) v = Later (eval (v :: p) t)
+      evalApp (Cls _ p s) t = Later (eval (t :: p) s)
+      evalApp (ClsRec vf v p s) t = Later (eval (ClsRec vf v p s :: t :: p) s)

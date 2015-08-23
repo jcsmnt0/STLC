@@ -9,9 +9,10 @@ import Ty
 
 %default total
 
-builtinSigs : Vect 13 (String, Ty)
+builtinSigs : Vect 14 (String, Ty)
 builtinSigs =
-  [ ("+", Num :-> Num :-> Num)
+  [ ("iszero", Num :-> Bool)
+  , ("+", Num :-> Num :-> Num)
   , ("-", Num :-> Num :-> Num)
   , ("*", Num :-> Num :-> Num)
   , ("/", Num :-> Num :-> Num)
@@ -31,6 +32,9 @@ builtinNames = map fst builtinSigs
 
 builtinTys : Vect (length builtinSigs) Ty
 builtinTys = map snd builtinSigs
+
+iszero : Term (S d) (Num :: g) Bool
+iszero = Prim [Num] Bool (\[x] => Now $ x == 0) [Var "x" Here]
 
 plus : Term (S d) (Num :: Num :: g) Num
 plus = Prim [Num, Num] Num (\[x, y] => Now $ x + y) [Var "x" (There Here), Var "y" Here]
@@ -71,10 +75,10 @@ eqBool = Prim [Bool, Bool] Bool (\[x, y] => Now $ x == y) [Var "x" (There Here),
 neqBool : Term (S d) (Bool :: Bool :: g) Bool
 neqBool = Prim [Bool, Bool] Bool (\[x, y] => Now $ x /= y) [Var "x" (There Here), Var "y" Here]
 
--- well damn - typechecking these is (figuratively, but practically) interminable
 builtinTerms : PiVect (Term 4 []) (map snd builtinSigs)
 builtinTerms =
-  [ Lam "x" (Lam "y" plus)
+  [ Lam "x" iszero
+  , Lam "x" (Lam "y" plus)
   , Lam "x" (Lam "y" minus)
   , Lam "x" (Lam "y" times)
   , Lam "x" (Lam "y" div)

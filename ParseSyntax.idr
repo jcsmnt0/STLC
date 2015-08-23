@@ -37,8 +37,29 @@ keywords =
   [ "if"
   , "then"
   , "else"
-  , "def"
+  , "fn"
   ]
+
+liftSyn : (m `LTE` n) -> Syn m -> Syn n
+liftSyn p (Var v) = Var v
+liftSyn p (Num x) = Num x
+liftSyn p (Bool x) = Bool x
+liftSyn p (As s a) = As (liftSyn p s) a
+liftSyn (LTESucc p) (LamRec vf a v b s) = LamRec vf a v b (liftSyn p s)
+liftSyn (LTESucc p) (Lam v ty s) = Lam v ty (liftSyn p s)
+liftSyn (LTESucc p) (sx :$ sy) = liftSyn p sx :$ liftSyn p sy
+liftSyn (LTESucc p) (If sb st sf) = If (liftSyn p sb) (liftSyn p st) (liftSyn p sf)
+liftSyn (LTESucc p) (Tuple ss) = Tuple (map (liftSyn p) ss)
+liftSyn (LTESucc p) (Variant ety s) = Variant ety (liftSyn p s)
+
+liftSyns : {ds : Vect n Nat} -> (ss : PiVect Syn ds) -> Vect n (Syn (fst (upperBound ds)))
+liftSyns {ds = ds} ss = zipWithToVect liftSyn (snd (upperBound ds)) ss
+
+liftExSyns : (ss : Vect n (Ex Syn)) -> Vect n (Syn (fst (upperBound (map fst ss))))
+liftExSyns ss = liftSyns (unzip ss)
+
+E0 : b Z -> Ex b
+E0 = E
 
 
 %default partial
@@ -68,7 +89,6 @@ parseTy = parseFunTy <|> parseParenTy <|> parseBaseTy
     where
       parseTupleTy : TyParser
       parseTupleTy = do
-        -- Tuple . toVect <$> (sep1 (token ',' *> spaces) parseTy <* spaces <* token ')')
         xs <- sep1 (spaces *> token ',' *> spaces) parseTy <* spaces <* token ')'
         return (Tuple (toVect xs))
 
@@ -84,25 +104,6 @@ parseTy = parseFunTy <|> parseParenTy <|> parseBaseTy
       as <- separator *> sep1 separator parseTy
       return (foldl (:->) a as)
 
-liftSyn : (m `LTE` n) -> Syn m -> Syn n
-liftSyn p (Var v) = Var v
-liftSyn p (Num x) = Num x
-liftSyn p (Bool x) = Bool x
-liftSyn (LTESucc p) (Lam v ty s) = Lam v ty (liftSyn p s)
-liftSyn (LTESucc p) (sx :$ sy) = liftSyn p sx :$ liftSyn p sy
-liftSyn (LTESucc p) (If sb st sf) = If (liftSyn p sb) (liftSyn p st) (liftSyn p sf)
-liftSyn (LTESucc p) (Tuple ss) = Tuple (map (liftSyn p) ss)
-liftSyn (LTESucc p) (Variant ety s) = Variant ety (liftSyn p s)
-
-liftSyns : {ds : Vect n Nat} -> (ss : PiVect Syn ds) -> Vect n (Syn (fst (upperBound ds)))
-liftSyns {ds = ds} ss = zipWithToVect liftSyn (snd (upperBound ds)) ss
-
-liftExSyns : (ss : Vect n (Ex Syn)) -> Vect n (Syn (fst (upperBound (map fst ss))))
-liftExSyns ss = liftSyns (unzip ss)
-
-E0 : b Z -> Ex b
-E0 = E
-
 parseNat : StringParser Nat
 parseNat = do
   xs <- many1 (match isDigit)
@@ -115,10 +116,19 @@ parseFloat = do
 
 mutual
   parseSyn : SynParser
-  parseSyn = choice [parseAs, parseVariant, parseApp, parseParenSyn, parseLam, parseNum, parseKeyword, parseVar]
+  parseSyn = choice [
+    parseAs,
+    parseVariant,
+    parseApp,
+    parseParenSyn,
+    parseDef,
+    parseLam,
+    parseNum,
+    parseKeyword,
+    parseVar]
 
   parseVar : SynParser
-  parseVar = E0 . Var <$> guard (\ident => not (elem ident keywords)) parseIdent
+  parseVar = E0 . Var <$> guard (\ident => not (elem ident keywords)) parseIdent <|> failWith "parseVar failed"
 
   parseKeyword : SynParser
   parseKeyword =
@@ -138,7 +148,15 @@ mutual
 
   parseAs : SynParser
   parseAs = do
-    E t <- choice [parseVariant, parseApp, parseParenSyn, parseLam, parseNum, parseKeyword, parseVar]
+    E t <- choice [
+      parseVariant,
+      parseApp,
+      parseParenSyn,
+      parseLam,
+      parseDef,
+      parseNum,
+      parseKeyword,
+      parseVar]
     spaces *> token ':' *> spaces
     ty <- parseTy
     return (E $ t `As` ty)
@@ -158,12 +176,35 @@ mutual
     E expr <- parseSyn
     return (E $ Lam var ty expr)
 
+  parseDef : SynParser
+  parseDef = do
+    string "fn" *> spaces1
+    vf <- parseIdent
+    spaces *> token '(' *> spaces
+    v <- parseIdent
+    spaces *> token ':' *> spaces
+    a <- parseTy
+    spaces *> token ')'
+    spaces *> token ':' *> spaces
+    b <- parseTy
+    token '.' *> spaces
+    E expr <- parseSyn
+    return (E $ LamRec vf a v b expr)
+
   parseVariant : SynParser
   parseVariant = do
     string "variant" *> spaces1
     i <- parseNat
     spaces1
-    E s <- choice [parseVariant, parseApp, parseParenSyn, parseLam, parseNum, parseKeyword, parseVar]
+    E s <- choice [
+      parseVariant,
+      parseApp,
+      parseParenSyn,
+      parseDef,
+      parseLam,
+      parseNum,
+      parseKeyword,
+      parseVar]
     return (E $ Variant i s)
 
   parseParenSyn : SynParser
@@ -191,7 +232,7 @@ mutual
     return (E $ foldApp (liftExSyns (x :: toVect xs)))
   where
     parseArg : SynParser
-    parseArg = choice [parseVariant, parseParenSyn, parseLam, parseNum, parseKeyword, parseVar]
+    parseArg = choice [parseVariant, parseParenSyn, parseNum, parseKeyword, parseVar]
 
     foldApp : Vect (S n) (Syn d) -> Syn (n + d)
     foldApp [s] = s

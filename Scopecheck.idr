@@ -28,6 +28,9 @@ scopecheck gv (Var x) =
 scopecheck gv (Lam v ty s) =
   [| (Lam ty) (scopecheck (v :: gv) s) |]
 
+scopecheck gv (LamRec vf a v b s) =
+  [| (LamRec a b) (scopecheck (vf :: v :: gv) s) |]
+
 scopecheck gv (sx :$ sy) =
   [| scopecheck gv sx :$ scopecheck gv sy |]
 
@@ -43,17 +46,14 @@ scopecheck gv (Variant ty s) =
 scopecheck gv (s `As` ty) =
   [| (flip As ty) (scopecheck gv s) |]
 
-scopecheck gv (Fix v ty s) =
-  [| (Fix ty) (scopecheck (v :: gv) s) |]
-
 unscope : Scoped d gv -> Syn d
 unscope (Var {v = v} _) = Var v
 unscope (Num x) = Num x
 unscope (Bool x) = Bool x
 unscope (Lam {v = v} ty s) = Lam v ty (unscope s)
+unscope (LamRec {vf = vf} {v = v} a b s) = LamRec vf a v b (unscope s)
 unscope (sx :$ sy) = unscope sx :$ unscope sy
 unscope (If sb st sf) = If (unscope sb) (unscope st) (unscope sf)
 unscope (Tuple ss) = Tuple (map unscope ss)
 unscope (Variant ty s) = Variant ty (unscope s)
 unscope (s `As` ty) = unscope s `As` ty
-unscope (Fix {v = v} ty s) = Fix v ty (unscope s)
