@@ -38,6 +38,8 @@ keywords =
   , "then"
   , "else"
   , "fn"
+  , "let"
+  , "in"
   ]
 
 liftSyn : (m `LTE` n) -> Syn m -> Syn n
@@ -45,9 +47,10 @@ liftSyn p (Var v) = Var v
 liftSyn p (Num x) = Num x
 liftSyn p (Bool x) = Bool x
 liftSyn p (As s a) = As (liftSyn p s) a
+liftSyn p (sx :$ sy) = liftSyn p sx :$ liftSyn p sy
+liftSyn (LTESucc p) (Let v s t) = Let v (liftSyn (LTESucc p) s) (liftSyn p t)
 liftSyn (LTESucc p) (LamRec vf a v b s) = LamRec vf a v b (liftSyn p s)
 liftSyn (LTESucc p) (Lam v ty s) = Lam v ty (liftSyn p s)
-liftSyn (LTESucc p) (sx :$ sy) = liftSyn p sx :$ liftSyn p sy
 liftSyn (LTESucc p) (If sb st sf) = If (liftSyn p sb) (liftSyn p st) (liftSyn p sf)
 liftSyn (LTESucc p) (Tuple ss) = Tuple (map (liftSyn p) ss)
 liftSyn (LTESucc p) (Variant ety s) = Variant ety (liftSyn p s)
@@ -72,7 +75,7 @@ parseIdent = pack <$> guard isValid (many1 (match isIdentChar <|> match isDigit)
     isValid (x :: _) = not (isDigit x)
 
 parseTy : TyParser
-parseTy = parseFunTy <|> parseParenTy <|> parseBaseTy
+parseTy = parseLamRecTy <|> parseParenTy <|> parseBaseTy
   where
     parseBaseTy : TyParser
     parseBaseTy = do
@@ -97,8 +100,8 @@ parseTy = parseFunTy <|> parseParenTy <|> parseBaseTy
         xs <- sep1 (spaces *> token '|' *> spaces) parseTy <* spaces <* token ')'
         return (Sum (toVect xs))
 
-    parseFunTy : TyParser
-    parseFunTy = do
+    parseLamRecTy : TyParser
+    parseLamRecTy = do
       a <- parseBaseTy <|> parseParenTy
       let separator = spaces *> string "->" *> spaces
       as <- separator *> sep1 separator parseTy
@@ -121,7 +124,8 @@ mutual
     parseVariant,
     parseApp,
     parseParenSyn,
-    parseDef,
+    parseLamRec,
+    parseLet,
     parseLam,
     parseNum,
     parseKeyword,
@@ -153,7 +157,8 @@ mutual
       parseApp,
       parseParenSyn,
       parseLam,
-      parseDef,
+      parseLamRec,
+      parseLet,
       parseNum,
       parseKeyword,
       parseVar]
@@ -176,8 +181,8 @@ mutual
     E expr <- parseSyn
     return (E $ Lam var ty expr)
 
-  parseDef : SynParser
-  parseDef = do
+  parseLamRec : SynParser
+  parseLamRec = do
     string "fn" *> spaces1
     vf <- parseIdent
     spaces *> token '(' *> spaces
@@ -191,20 +196,23 @@ mutual
     E expr <- parseSyn
     return (E $ LamRec vf a v b expr)
 
+  parseLet : SynParser
+  parseLet = do
+    string "let" *> spaces
+    v <- parseIdent
+    spaces *> token '=' *> spaces
+    E s <- parseSyn
+    spaces1 *> string "in" *> spaces1
+    E t <- parseSyn
+    let [s', t'] = liftSyns [s, t]
+    return (E $ Let v (liftSyn lteSucc s') t')
+
   parseVariant : SynParser
   parseVariant = do
     string "variant" *> spaces1
     i <- parseNat
     spaces1
-    E s <- choice [
-      parseVariant,
-      parseApp,
-      parseParenSyn,
-      parseDef,
-      parseLam,
-      parseNum,
-      parseKeyword,
-      parseVar]
+    E s <- parseSyn
     return (E $ Variant i s)
 
   parseParenSyn : SynParser
@@ -236,6 +244,6 @@ mutual
 
     foldApp : Vect (S n) (Syn d) -> Syn (n + d)
     foldApp [s] = s
-    foldApp {n = S n} {d = d} (s1 :: s2 :: ss) =
-      rewrite plusSuccRightSucc n d in
-        foldApp ((s1 :$ s2) :: map (liftSyn ltePlusOne) ss)
+    foldApp (s1 :: s2 :: ss) =
+      -- rewrite plusSuccRightSucc n d in
+        liftSyn lteSucc (foldApp ((s1 :$ s2) :: ss))

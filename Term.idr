@@ -71,7 +71,7 @@ namespace Term
     (:$) :
       Term d g (b :-> a) ->
       Term d g b ->
-      Term (S d) g a
+      Term d g a
 
     If :
       Term d g Bool ->

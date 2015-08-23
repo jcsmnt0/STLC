@@ -81,3 +81,9 @@ typecheck gty (s `As` ty) = do
   case ty =? ty' of
     Yes _ => Right (E tm)
     No _ => Left (As s ty ty')
+
+typecheck gty (Let {v = v} s t) = do
+  E {x = a} s' <- typecheck gty s
+  E {x = b} t' <- typecheck (a :: gty) t
+  return (E (Lam v t' :$ s'))
+  -- return (E (Lam v t' :$ s'))

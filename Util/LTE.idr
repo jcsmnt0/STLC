@@ -14,6 +14,6 @@ lteTrans : x `LTE` y -> y `LTE` z -> x `LTE` z
 lteTrans LTEZero q = LTEZero
 lteTrans (LTESucc p) (LTESucc q) = LTESucc (lteTrans p q)
 
-ltePlusOne : LTE x (S x)
-ltePlusOne {x = Z} = LTEZero
-ltePlusOne {x = S _} = LTESucc ltePlusOne
+lteSucc : LTE x (S x)
+lteSucc {x = Z} = LTEZero
+lteSucc {x = S _} = LTESucc lteSucc
