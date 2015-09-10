@@ -1,7 +1,6 @@
 module Main
 
 import Data.Vect
-import Debug.Trace
 
 import ParseSyntax
 import Parser
@@ -26,8 +25,6 @@ eval src =  do
   MkResult (E s) rest <- runParser parseSyn src
   db <- scopecheck builtinNames s
   E {x = ty} tm <- mapLeft show (typecheck builtinTys db)
-  trace (show tm) $ return ()
-  trace (show ty) $ return ()
   return $ "\n" ++ show tm ++ " : " ++ show ty ++ "\n=>\n" ++ show (impatience (eval builtinVals tm))
 
 rep : IO Bool

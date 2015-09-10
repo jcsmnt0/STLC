@@ -59,6 +59,7 @@ liftSyn (LTESucc p) (Tuple ss) = Tuple (map (liftSyn p) ss)
 liftSyn (LTESucc p) (Variant ety s) = Variant ety (liftSyn p s)
 -- m is definitely decreasing in the recursive call here, I'm not sure why it's not picked up as total
 liftSyn (LTESucc p) (Case s ss) = Case (liftSyn p s) (map (\(v, s) => (v, assert_total (liftSyn p s))) ss)
+liftSyn (LTESucc p) (Unpack vs s t) = Unpack vs (liftSyn (LTESucc p) s) (liftSyn p t)
 
 liftSyns : {ds : Vect n Nat} -> (ss : PiVect Syn ds) -> Vect n (Syn (fst (upperBound ds)))
 liftSyns {ds = ds} ss = zipWithToVect liftSyn (snd (upperBound ds)) ss
@@ -206,13 +207,27 @@ mutual
   parseLet : SynParser
   parseLet = do
     string "let" *> spaces
-    v <- parseIdent
-    spaces *> token '=' *> spaces
-    E s <- parseSyn
-    spaces1 *> string "in" *> spaces1
-    E t <- parseSyn
-    let [s', t'] = liftSyns [s, t]
-    return (E $ Let v (liftSyn lteSucc s') t')
+    parseUnpackingLet <|> parseSimpleLet
+  where
+    parseUnpackingLet : SynParser
+    parseUnpackingLet = do
+      vs <- between (token '(') (token ')') (sep1 (spaces *> token ',' *> spaces) parseIdent)
+      spaces *> token '=' *> spaces
+      E s <- parseSyn
+      spaces1 *> string "in" *> spaces1
+      E t <- parseSyn
+      let [s', t'] = liftSyns [s, t]
+      return (E $ Unpack (toVect vs) (liftSyn lteSucc s') t')
+
+    parseSimpleLet : SynParser
+    parseSimpleLet = do
+      v <- parseIdent
+      spaces *> token '=' *> spaces
+      E s <- parseSyn
+      spaces1 *> string "in" *> spaces1
+      E t <- parseSyn
+      let [s', t'] = liftSyns [s, t]
+      return (E $ Let v (liftSyn lteSucc s') t')
 
   parseCase : SynParser
   parseCase = do

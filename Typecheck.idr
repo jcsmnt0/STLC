@@ -25,6 +25,7 @@ data TypeError
   | Fix
   | CantInfer
   | Case
+  | Unpack
 
 mutual
   typecheck :
@@ -78,15 +79,24 @@ mutual
       typecheck _ (Variant i s `As` Sum {n = n} tys) | (Right (E tm), Just i') | No _ = Left Variant
     typecheck _ _ | _ = Left Variant
 
-  typecheck gty (Case {m = m} {vs = vs} s ss) with (typecheck gty s)
-    typecheck gty (Case {m = m} {vs = vs} s ss) | (Right (E {x = Sum {n = n} as} t)) with (m =? n)
-      typecheck gty (Case {m = m} {vs = vs} s ss) | (Right (E {x = Sum {n = m} as} t)) | Yes Refl =
+  typecheck gty (Case {n = m} {vs = vs} s ss) with (typecheck gty s)
+    typecheck gty (Case {n = m} {vs = vs} s ss) | (Right (E {x = Sum {n = n} as} t)) with (m =? n)
+      typecheck gty (Case {n = m} {vs = vs} s ss) | (Right (E {x = Sum {n = m} as} t)) | Yes Refl =
         -- idris seems to have issues with totality of mutually recursive calls
         case assert_total (typecheckCaseVect gty as ss) of
           Right (_ ** ts) => Right (E $ Case t vs ts)
           Left err => Left Case
-      typecheck gty (Case {m = m} s ss) | _ | No _ = Left Case
-    typecheck gty (Case {m = m} s ss) | _ = Left Case
+      typecheck gty (Case {n = m} {vs = vs} s ss) | _ | No _ = Left Case
+    typecheck gty (Case {n = m} {vs = vs} s ss) | _ = Left Case
+
+  typecheck gty (Unpack {n = m} {vs = vs} s t) with (typecheck gty s)
+    typecheck gty (Unpack {n = m} {vs = vs} s t) | Right (E {x = Tuple {n = n} as} s') with (m =? n)
+      typecheck gty (Unpack {n = m} {vs = vs} s t) | Right (E {x = Tuple {n = m} as} s') | Yes Refl = do
+        E t' <- assert_total (typecheck (as ++ gty) t)
+        return (E $ Unpack vs s' t')
+      typecheck gty (Unpack {n = m} {vs = vs} s t) | _ | _ = Left Unpack
+    typecheck gty (Unpack {n = m} {vs = vs} s t) | _ = Left Unpack
+    -- E t' <- typecheck 
 
   typecheck gty (s `As` ty) = do
     E {x = ty'} tm <- typecheck gty s
@@ -96,7 +106,7 @@ mutual
 
   typecheck gty (Let {v = v} s t) = do
     E {x = a} s' <- typecheck gty s
-    E {x = b} t' <- typecheck (a :: gty) t
+    E t' <- typecheck (a :: gty) t
     return (E (Lam v t' :$ s'))
 
   -- this can probably be made less scary

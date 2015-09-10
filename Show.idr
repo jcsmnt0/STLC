@@ -43,6 +43,7 @@ instance Show (Syn d) where
   show (Tuple xs) = "(" ++ sepConcat ", " (map show xs) ++ ")"
   show (Variant i s) = "variant " ++ show i ++ " " ++ show s
   show (Case s ss) = "case " ++ show s ++ " of { " ++ sepConcat "; " (map (\(v, s) => v ++ " => " ++ show ss) ss)
+  show (Unpack vs s t) = "let (" ++ sepConcat ", " vs ++ ") = " ++ show s ++ " in " ++ show t
   show (s `As` ty) = "(" ++ show s ++ " : " ++ show ty ++ ")"
 
 covering strip : Term d gty t -> Syn d
@@ -56,6 +57,7 @@ strip (If b t f) = If (strip b) (strip t) (strip f)
 strip (Tuple xs) = Tuple (mapToVect strip xs)
 strip (Variant {as = as} i tm) = Variant (finToNat (toFin i)) (strip tm) `As` Sum as
 strip (Case s vs ss) = Case (strip s) (zip vs (mapToVect strip ss))
+strip (Unpack vs s t) = Unpack vs (strip s) (strip t)
 strip (Prim _ _ _ _) = Var "<primitive thing>"
 
 instance Show (Term d gty t) where
@@ -77,3 +79,4 @@ instance Show TypeError where
       Variant => "variant"
       As s ty ty' => show (unscope s) ++ " is of type " ++ show ty' ++ " but should be of type " ++ show ty
       Case => "case"
+      Unpack => "unpack"

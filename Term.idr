@@ -42,8 +42,9 @@ namespace Term
       PiVect (\a => Term d (a :: g) b) as ->
       Term (S d) g b
 
-    Splat :
-      Term d g (Tuple as) ->
+    Unpack :
+      Vect n String ->
+      Term (S d) g (Tuple as) ->
       Term d (as ++ g) b ->
       Term (S d) g b
 
@@ -165,7 +166,7 @@ mutual
     evalCase p (c :: _) (Variant Here v) = Later (eval (v :: p) c)
     evalCase p (_ :: cs) (Variant (There e) v) = evalCase p cs (Variant e v)
 
-  eval p (Splat tm1 tm2) = do
+  eval p (Unpack vs tm1 tm2) = do
     Tuple xs <- eval p tm1
     eval (xs ++ p) tm2
 

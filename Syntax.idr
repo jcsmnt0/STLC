@@ -26,8 +26,9 @@ namespace Syn
     Tuple : Vect n (Syn d) -> Syn (S d)
     Variant : Nat -> Syn d -> Syn (S d)
     Case : Syn d -> Vect n (String, Syn d) -> Syn (S d)
+    Unpack : Vect n String -> Syn (S d) -> Syn d -> Syn (S d)
     As : Syn d -> Ty -> Syn d
-    Let : String -> Syn (S d) -> Syn d -> Syn (S d)
+    Let : String -> Syn (S d) -> Syn d -> Syn (S d) -- Let is really a special case of Unpack
 
   depth : Syn d -> Nat
   depth {d = d} _ = d
@@ -44,6 +45,7 @@ namespace Scoped
     If : Scoped d gv -> Scoped d gv -> Scoped d gv -> Scoped (S d) gv
     Tuple : Vect n (Scoped d gv) -> Scoped (S d) gv
     Variant : Nat -> Scoped d gv -> Scoped (S d) gv
-    Case : {vs : Vect m String} -> Scoped d gv -> PiVect (\v => Scoped d (v :: gv)) vs -> Scoped (S d) gv
+    Case : {vs : Vect n String} -> Scoped d gv -> PiVect (\v => Scoped d (v :: gv)) vs -> Scoped (S d) gv
+    Unpack : {vs : Vect n String} -> Scoped (S d) gv -> Scoped d (vs ++ gv) -> Scoped (S d) gv
     As : Scoped d gv -> Ty -> Scoped d gv
     Let : Scoped (S d) gv -> Scoped d (v :: gv) -> Scoped (S d) gv

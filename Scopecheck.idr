@@ -55,6 +55,9 @@ scopecheck gv (Case s ss) =
       -- I'm pretty sure this is terminating because d is decreasing, but the typechecker doesn't see it
       [| assert_total (scopecheck (v :: gv) s) :: scopecheckCaseVect ss |]
 
+scopecheck gv (Unpack vs s t) =
+  Unpack <$> scopecheck gv s <*> scopecheck (vs ++ gv) t
+
 scopecheck gv (s `As` ty) =
   return (!(scopecheck gv s) `As` ty)
 
@@ -77,5 +80,6 @@ unscope (Case s ss) = Case (unscope s) (unscopeCaseVect ss)
     unscopeCaseVect [] = []
     -- same thing about totality here as with scopecheckCaseVect
     unscopeCaseVect ((::) {x = v} s ss) = (v, assert_total (unscope s)) :: unscopeCaseVect ss
+unscope (Unpack {vs = vs} s t) = Unpack vs (unscope s) (unscope t)
 unscope (s `As` ty) = unscope s `As` ty
 unscope (Let {v = v} s t) = Let v (unscope s) (unscope t)
