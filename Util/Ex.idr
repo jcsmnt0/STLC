@@ -4,6 +4,10 @@ module Ex
 
 infixr 0 $$
 
+||| Lightweight syntax for dependent pairs whose first value can usually be inferred:
+||| Ex b <=> (x : _ ** b _)
+||| E y <=> (_ ** y)
+||| (could probably be a syntax definition instead?)
 data Ex : (a -> Type) -> Type where
   E : b x -> Ex b
 

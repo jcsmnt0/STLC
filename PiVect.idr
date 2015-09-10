@@ -26,27 +26,19 @@ namespace PiVect
   mapToVect {ps = []} f [] = []
   mapToVect {ps = _ :: _} f (x :: xs) = f x :: mapToVect f xs
 
-  zipWithToVect :
-    {ps : Vect n a} ->
-    ({x : a} -> p x -> q x -> c) ->
-    PiVect p ps ->
-    PiVect q ps ->
-    Vect n c
+  mapToPiVect : {p : a -> Type} -> (f : (x : a) -> p x) -> (xs : Vect n a) -> PiVect p xs
+  mapToPiVect f [] = []
+  mapToPiVect f (x :: xs) = f x :: mapToPiVect f xs
+
+  zipWithToVect : {ps : Vect n a} -> ({x : a} -> p x -> q x -> c) -> PiVect p ps -> PiVect q ps -> Vect n c
   zipWithToVect {ps = []} f [] [] = []
   zipWithToVect {ps = _ :: _} f (x :: xs) (y :: ys) = f x y :: zipWithToVect f xs ys
 
-  map :
-    (f : a -> b) ->
-    ({x : a} -> p x -> q (f x)) ->
-    PiVect p ps ->
-    PiVect q (map f ps)
+  map : (f : a -> b) -> ({x : a} -> p x -> q (f x)) -> PiVect p ps -> PiVect q (map f ps)
   map {ps = []} f g [] = []
   map {ps = _ :: _} f g (x :: xs) = g x :: map f g xs
 
-  mapId :
-    ({x : a} -> p x -> q x) ->
-    PiVect p ps ->
-    PiVect q ps
+  mapId : ({x : a} -> p x -> q x) -> PiVect p ps -> PiVect q ps
   mapId {ps = []} g [] = []
   mapId {ps = _ :: _} g (x :: xs) = g x :: mapId g xs
 
@@ -58,24 +50,12 @@ namespace PiVect
   indexElem Here (x :: _) = x
   indexElem (There p) (_ :: xs) = indexElem p xs
 
-  -- it can't really infer m . p - a DSL for those predicates would be useful
-  sequence : Monad m => {p : a -> Type} -> PiVect (m . p) ps -> m (PiVect p ps)
-  sequence {ps = []} [] = return []
-  sequence {ps = _ :: _} (x :: xs) = do
-    x' <- x
-    xs' <- PiVect.sequence xs
-    return (x' :: xs')
-
-namespace Vect
-  map :
-    (f : (x : a) -> p x) ->
-    (ps : Vect n a) ->
-    PiVect p ps
-  map f [] = []
-  map f (x :: xs) = f x :: map f xs
+  -- it can't really infer m . p
+  sequence : Applicative m => {p : a -> Type} -> PiVect (m . p) ps -> m (PiVect p ps)
+  sequence {ps = []} [] = pure []
+  sequence {ps = _ :: _} (x :: xs) = [| x :: sequence xs |]
 
 namespace LTE
-  -- this should be doable with generic PiVect functions
   raise : PiVect (\x => x `LTE` y) xs -> y `LTE` z -> PiVect (\x => x `LTE` z) xs
   raise {xs = []} [] _ = []
   raise {xs = _ :: _} (p :: ps) q = lteTrans p q :: raise ps q

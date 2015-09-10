@@ -40,6 +40,9 @@ keywords =
   , "fn"
   , "let"
   , "in"
+  , "case"
+  , "of"
+  , "variant"
   ]
 
 liftSyn : (m `LTE` n) -> Syn m -> Syn n
@@ -54,6 +57,8 @@ liftSyn (LTESucc p) (Lam v ty s) = Lam v ty (liftSyn p s)
 liftSyn (LTESucc p) (If sb st sf) = If (liftSyn p sb) (liftSyn p st) (liftSyn p sf)
 liftSyn (LTESucc p) (Tuple ss) = Tuple (map (liftSyn p) ss)
 liftSyn (LTESucc p) (Variant ety s) = Variant ety (liftSyn p s)
+-- m is definitely decreasing in the recursive call here, I'm not sure why it's not picked up as total
+liftSyn (LTESucc p) (Case s ss) = Case (liftSyn p s) (map (\(v, s) => (v, assert_total (liftSyn p s))) ss)
 
 liftSyns : {ds : Vect n Nat} -> (ss : PiVect Syn ds) -> Vect n (Syn (fst (upperBound ds)))
 liftSyns {ds = ds} ss = zipWithToVect liftSyn (snd (upperBound ds)) ss
@@ -117,25 +122,27 @@ parseFloat = do
   xs <- many1 (match isDigit)
   return (cast {to = Float} $ pack xs)
 
+-- my computer is dying trying to typecheck this. todo
 mutual
   parseSyn : SynParser
-  parseSyn = choice [
-    parseAs,
-    parseVariant,
-    parseApp,
-    parseParenSyn,
-    parseLamRec,
-    parseLet,
-    parseLam,
-    parseNum,
-    parseKeyword,
-    parseVar]
+  parseSyn = parseAs <|>
+    parseVariant <|>
+    parseApp <|>
+    parseParenSyn <|>
+    parseLamRec <|>
+    parseLet <|>
+    parseLam <|>
+    parseNum <|>
+    parseBoolKeyword <|>
+    parseCase <|>
+    parseVar <|>
+    failWith "couldn't parse"
 
   parseVar : SynParser
-  parseVar = E0 . Var <$> guard (\ident => not (elem ident keywords)) parseIdent <|> failWith "parseVar failed"
+  parseVar = E0 . Var <$> guard (\ident => not (elem ident keywords)) parseIdent
 
-  parseKeyword : SynParser
-  parseKeyword =
+  parseBoolKeyword : SynParser
+  parseBoolKeyword =
     case !parseIdent of
       "true" => return (E0 $ Bool True)
       "false" => return (E0 $ Bool False)
@@ -152,16 +159,16 @@ mutual
 
   parseAs : SynParser
   parseAs = do
-    E t <- choice [
-      parseVariant,
-      parseApp,
-      parseParenSyn,
-      parseLam,
-      parseLamRec,
-      parseLet,
-      parseNum,
-      parseKeyword,
-      parseVar]
+    E t <- parseVariant <|>
+      parseApp <|>
+      parseParenSyn <|>
+      parseLam <|>
+      parseLamRec <|>
+      parseLet <|>
+      parseNum <|>
+      parseBoolKeyword <|>
+      parseCase <|>
+      parseVar
     spaces *> token ':' *> spaces
     ty <- parseTy
     return (E $ t `As` ty)
@@ -207,12 +214,35 @@ mutual
     let [s', t'] = liftSyns [s, t]
     return (E $ Let v (liftSyn lteSucc s') t')
 
+  parseCase : SynParser
+  parseCase = do
+    string "case" *> spaces1
+    s <- parseSyn
+    spaces1 *> string "of" *> spaces1
+    token '{' *> spaces
+    let separator = spaces *> token ';' *> spaces
+    cases <- sep1 separator [| MkPair (parseIdent <* spaces1 <* string "=>" <* spaces1) parseSyn |]
+    maybe separator
+    let (vs, ss) = unzip (toVect cases)
+    let (s' :: ss') = liftExSyns (s :: ss)
+    spaces *> token '}'
+    return (E $ Case s' (zip vs ss'))
+
   parseVariant : SynParser
   parseVariant = do
     string "variant" *> spaces1
     i <- parseNat
     spaces1
-    E s <- parseSyn
+    E s <- parseVariant <|>
+      parseApp <|>
+      parseParenSyn <|>
+      parseLamRec <|>
+      parseLet <|>
+      parseLam <|>
+      parseNum <|>
+      parseBoolKeyword <|>
+      parseCase <|>
+      parseVar
     return (E $ Variant i s)
 
   parseParenSyn : SynParser
@@ -240,10 +270,9 @@ mutual
     return (E $ foldApp (liftExSyns (x :: toVect xs)))
   where
     parseArg : SynParser
-    parseArg = choice [parseVariant, parseParenSyn, parseNum, parseKeyword, parseVar]
+    parseArg = choice [parseParenSyn, parseNum, parseBoolKeyword, parseVar]
 
     foldApp : Vect (S n) (Syn d) -> Syn (n + d)
     foldApp [s] = s
     foldApp (s1 :: s2 :: ss) =
-      -- rewrite plusSuccRightSucc n d in
         liftSyn lteSucc (foldApp ((s1 :$ s2) :: ss))

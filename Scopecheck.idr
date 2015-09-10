@@ -2,6 +2,7 @@ module Scopecheck
 
 import Data.Vect
 
+import PiVect
 import Syntax
 import Ty
 
@@ -43,6 +44,17 @@ scopecheck gv (Tuple ss) =
 scopecheck gv (Variant ty s) =
   Variant ty <$> scopecheck gv s
 
+scopecheck gv (Case s ss) =
+  Case <$> scopecheck gv s <*> scopecheckCaseVect ss
+  where
+    scopecheckCaseVect :
+      (xs : Vect n (String, Syn d)) ->
+      Either String (PiVect (\v => Scoped d (v :: gv)) (map fst xs))
+    scopecheckCaseVect [] = Right []
+    scopecheckCaseVect {n = S n} ((v, s) :: ss) =
+      -- I'm pretty sure this is terminating because d is decreasing, but the typechecker doesn't see it
+      [| assert_total (scopecheck (v :: gv) s) :: scopecheckCaseVect ss |]
+
 scopecheck gv (s `As` ty) =
   return (!(scopecheck gv s) `As` ty)
 
@@ -59,5 +71,11 @@ unscope (sx :$ sy) = unscope sx :$ unscope sy
 unscope (If sb st sf) = If (unscope sb) (unscope st) (unscope sf)
 unscope (Tuple ss) = Tuple (map unscope ss)
 unscope (Variant ty s) = Variant ty (unscope s)
+unscope (Case s ss) = Case (unscope s) (unscopeCaseVect ss)
+  where
+    unscopeCaseVect : {vs : Vect n String} -> PiVect (\v => Scoped d (v :: gv)) vs -> Vect n (String, Syn d)
+    unscopeCaseVect [] = []
+    -- same thing about totality here as with scopecheckCaseVect
+    unscopeCaseVect ((::) {x = v} s ss) = (v, assert_total (unscope s)) :: unscopeCaseVect ss
 unscope (s `As` ty) = unscope s `As` ty
 unscope (Let {v = v} s t) = Let v (unscope s) (unscope t)

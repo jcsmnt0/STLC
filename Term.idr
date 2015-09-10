@@ -36,8 +36,10 @@ namespace Term
       Term (S d) g (Sum as)
 
     Case :
-      PiVect (\a => Term d (a :: g) b) as ->
+      {as : Vect n Ty} ->
       Term d g (Sum as) ->
+      Vect n String ->
+      PiVect (\a => Term d (a :: g) b) as ->
       Term (S d) g b
 
     Splat :
@@ -156,7 +158,7 @@ mutual
   eval p (Variant e t) =
     Variant e <$> eval p t
 
-  eval p (Case cs t) =
+  eval p (Case t vs cs) =
     eval p t >>= evalCase p cs
   where
     evalCase : PiVect Val g -> PiVect (\a => Term d (a :: g) b) as -> Val (Sum as) -> Partial (Val b)

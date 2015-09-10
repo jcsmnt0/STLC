@@ -46,7 +46,6 @@ instance DecEq Ty where
 
   decEq Num Num = Yes Refl
 
-  -- this assert is also stupid
   decEq (Tuple ss) (Tuple ts) with (assert_total (ss =? ts))
     decEq (Tuple ss) (Tuple ss) | Yes Refl = Yes Refl
     decEq (Tuple ss) (Tuple ts) | No contra = No (because contra)

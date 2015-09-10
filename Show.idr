@@ -4,6 +4,7 @@ import Data.Fin
 import Data.Vect
 
 import ParseSyntax
+import Partial
 import PiVect
 import Scopecheck
 import Syntax
@@ -29,7 +30,7 @@ instance Show Ty where
 instance Show (Syn d) where
   show (Var v) = v
   show (Num x) = show x
-  show (Bool x) = show x
+  show (Bool x) = if x then "true" else "false"
   show (LamRec vf a v b s) = "(fn " ++ vf ++ "(" ++ v ++ ": " ++ show a ++ "): " ++ show b ++ ". " ++ show s ++ ")"
   show (Lam name ty body) = "\\" ++ name ++ ": " ++ show ty ++ ". " ++ show body
   show (Lam v ty x :$ Lam v' ty' x') = "(" ++ show (Lam v ty x) ++ ") (" ++ show (Lam v' ty' x') ++ ")"
@@ -41,9 +42,10 @@ instance Show (Syn d) where
   show (If b t f) = "if " ++ show b ++ " then " ++ show t ++ " else " ++ show f
   show (Tuple xs) = "(" ++ sepConcat ", " (map show xs) ++ ")"
   show (Variant i s) = "variant " ++ show i ++ " " ++ show s
+  show (Case s ss) = "case " ++ show s ++ " of { " ++ sepConcat "; " (map (\(v, s) => v ++ " => " ++ show ss) ss)
   show (s `As` ty) = "(" ++ show s ++ " : " ++ show ty ++ ")"
 
-strip : Term d gty t -> Syn d
+covering strip : Term d gty t -> Syn d
 strip (Bool x) = Bool x
 strip (Num x) = Num x
 strip (Var v _) = Var v
@@ -53,7 +55,8 @@ strip (x :$ y) = strip x :$ strip y
 strip (If b t f) = If (strip b) (strip t) (strip f)
 strip (Tuple xs) = Tuple (mapToVect strip xs)
 strip (Variant {as = as} i tm) = Variant (finToNat (toFin i)) (strip tm) `As` Sum as
-strip _ = Var "output for this thing is not implemented"
+strip (Case s vs ss) = Case (strip s) (zip vs (mapToVect strip ss))
+strip (Prim _ _ _ _) = Var "<primitive thing>"
 
 instance Show (Term d gty t) where
   show {t = t} tm = show (strip tm)
@@ -64,7 +67,7 @@ instance Show (Val t) where
   show (Cls {a = a} v p x) = "\\" ++ v ++ ": " ++ show a ++ ". " ++ show (strip x)
   show (ClsRec {a = a} {b = b} vf v p s) = "fn " ++ vf ++ "(" ++ v ++ ": " ++ show a ++ "): " ++ show b ++ ". " ++ show (strip s) ++ ")"
   show (Tuple xs) = "(" ++ sepConcat ", " (mapToVect (\x => show x) xs) ++ ")"
-  show (Variant {as = as} _ x) = "(" ++ show x ++ " : (" ++ sepConcat ", " (map show as) ++ "))"
+  show (Variant {as = as} _ x) = "(" ++ show x ++ " : (" ++ sepConcat " | " (map show as) ++ "))"
 
 instance Show TypeError where
   show err = "type error: " ++
@@ -73,3 +76,4 @@ instance Show TypeError where
       If => "if"
       Variant => "variant"
       As s ty ty' => show (unscope s) ++ " is of type " ++ show ty' ++ " but should be of type " ++ show ty
+      Case => "case"

@@ -106,6 +106,12 @@ instance Sequence s i => Monad (Parser e s i) where
 noop : (Sequence s i, Monoid o) => Parser e s i o
 noop = neutral
 
+any : (Sequence s i, ParseError e) => Parser e s i i
+any = MkParser $ \i =>
+  case uncons i of
+    Nothing => Left (fromString "any failed: no input")
+    Just (x, xs) => Right (MkResult x xs)
+
 maybe : (Sequence s i, ParseError e) => Parser e s i o -> Parser e s i (Maybe o)
 maybe p = MkParser $ \i =>
   case runParser p i of
