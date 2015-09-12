@@ -55,5 +55,13 @@ All subject to change on a whim, or even possibly for good reasons.
 # How to build
 Any relatively recent version of Idris should work - just run `idris --build stlc.ipkg` and wait for the `stlc` executable to come into being.
 
-# How to run
-The only way to interact with the language right now is through the REPL that launches when you run the `stlc` binary. When you hit Enter after typing in an expression, you'll get back a desugared representation of the expression annotated with its type, followed by the result of evaluating the expression. Once you're bored of that, enter `exit` to exit.
+# REPL
+A REPL launches when you run `stlc` with no arguments. Type in an expression and hit Enter to receive the evaluated result. Once you're bored of that, enter `exit` to exit.
+
+# Running programs
+Run `stlc <file>` to run the interpreter over a program. Programs are made up of whitespace-separated definitions, which look like `def <name> = <expr>`. The output of the interpreter is the result of evaluating the last definition in the file, so e.g. the program
+
+    def x = 3
+    def y = 4
+    def z = + x y
+prints out "7" when interpreted.
