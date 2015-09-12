@@ -27,6 +27,7 @@ instance Show Ty where
   show ((s :-> t) :-> r) = "(" ++ show (s :-> t) ++ ")" ++ " -> " ++ show r
   show (s :-> t) = show s ++ " -> " ++ show t
 
+-- this probably gets parentheses wrong sometimes
 instance Show (Syn d) where
   show (Var v) = v
   show (Num x) = show x
@@ -43,6 +44,7 @@ instance Show (Syn d) where
   show (Tuple xs) = "(" ++ sepConcat ", " (map show xs) ++ ")"
   show (Variant i s) = "variant " ++ show i ++ " " ++ show s
   show (Case s ss) = "case " ++ show s ++ " of { " ++ sepConcat "; " (map (\(v, s) => v ++ " => " ++ show ss) ss)
+  show (Let v s t) = "let " ++ v ++ " = " ++ show s ++ " in " ++ show t
   show (Unpack vs s t) = "let (" ++ sepConcat ", " vs ++ ") = " ++ show s ++ " in " ++ show t
   show (s `As` ty) = "(" ++ show s ++ " : " ++ show ty ++ ")"
 
@@ -77,6 +79,8 @@ instance Show TypeError where
       App => "app"
       If => "if"
       Variant => "variant"
+      LamRec => "lam rec"
       As s ty ty' => show (unscope s) ++ " is of type " ++ show ty' ++ " but should be of type " ++ show ty
+      CantInfer => "can't infer"
       Case => "case"
       Unpack => "unpack"

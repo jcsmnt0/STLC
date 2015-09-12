@@ -1,5 +1,6 @@
 module ParseSyntax
 
+import Control.Catchable
 import Data.Vect
 
 import Parser
@@ -14,11 +15,11 @@ import Util.Vect
 
 %default total
 
-SynParser : Type
-SynParser = StringParser (Ex Syn)
+SynParser : (Type -> Type) -> Type
+SynParser m = StringParser m (Ex Syn)
 
-TyParser : Type
-TyParser = StringParser Ty
+TyParser : (Type -> Type) -> Type
+TyParser m = StringParser m Ty
 
 isLowercaseLetter : Char -> Bool
 isLowercaseLetter c = 'a' <= c && c <= 'z'
@@ -43,6 +44,7 @@ keywords =
   , "case"
   , "of"
   , "variant"
+  , "def"
   ]
 
 liftSyn : (m `LTE` n) -> Syn m -> Syn n
@@ -73,17 +75,17 @@ E0 = E
 
 %default partial
 
-parseIdent : StringParser String
+covering parseIdent : (Monad m, Catchable m String) => StringParser m String
 parseIdent = pack <$> guard isValid (many1 (match isIdentChar <|> match isDigit))
   where
     isValid : List Char -> Bool
     isValid [] = False -- can't happen because of many1
     isValid (x :: _) = not (isDigit x)
 
-parseTy : TyParser
+covering parseTy : (Monad m, Catchable m String) => TyParser m
 parseTy = parseLamRecTy <|> parseParenTy <|> parseBaseTy
   where
-    parseBaseTy : TyParser
+    parseBaseTy : (Monad m, Catchable m String) => TyParser m
     parseBaseTy = do
       ty <- many (match isLowercaseLetter <|> match isUppercaseLetter)
       case pack ty of
@@ -91,95 +93,105 @@ parseTy = parseLamRecTy <|> parseParenTy <|> parseBaseTy
         "Bool" => return Bool
         ty' => failWith (pack ty ++ " isn't a valid type")
 
-    parseParenTy : TyParser
+    parseParenTy : (Monad m, Catchable m String) => TyParser m
     parseParenTy = do
       token '(' *> spaces
       parseTupleTy <|> parseSumTy <|> (parseTy <* spaces <* token ')')
     where
-      parseTupleTy : TyParser
+      parseTupleTy : (Monad m, Catchable m String) => TyParser m
       parseTupleTy = do
         xs <- sep1 (spaces *> token ',' *> spaces) parseTy <* spaces <* token ')'
         return (Tuple (toVect xs))
 
-      parseSumTy : TyParser
+      parseSumTy : (Monad m, Catchable m String) => TyParser m
       parseSumTy = do
         xs <- sep1 (spaces *> token '|' *> spaces) parseTy <* spaces <* token ')'
         return (Sum (toVect xs))
 
-    parseLamRecTy : TyParser
+    parseLamRecTy : (Monad m, Catchable m String) => TyParser m
     parseLamRecTy = do
       a <- parseBaseTy <|> parseParenTy
       let separator = spaces *> string "->" *> spaces
       as <- separator *> sep1 separator parseTy
       return (foldl (:->) a as)
 
-parseNat : StringParser Nat
+covering parseNat : (Monad m, Catchable m String) => StringParser m Nat
 parseNat = do
   xs <- many1 (match isDigit)
   return (cast {to = Nat} $ cast {to = Int} $ pack xs)
 
-parseFloat : StringParser Float
+covering parseFloat : (Monad m, Catchable m String) => StringParser m Float
 parseFloat = do
   xs <- many1 (match isDigit)
   return (cast {to = Float} $ pack xs)
 
--- my computer is dying trying to typecheck this. todo
 mutual
-  parseSyn : SynParser
-  parseSyn = parseAs <|>
-    parseVariant <|>
-    parseApp <|>
-    parseParenSyn <|>
-    parseLamRec <|>
-    parseLet <|>
-    parseLam <|>
-    parseNum <|>
-    parseBoolKeyword <|>
-    parseCase <|>
-    parseVar <|>
-    failWith "couldn't parse"
+  covering parseSyn : (Monad m, Catchable m String) => SynParser m
+  parseSyn = do
+    s <- parseAs <|>
+      parseVariant <|>
+      parseParenSyn <|>
+      parseLamRec <|>
+      parseLet <|>
+      parseLam <|>
+      parseNum <|>
+      parseBool <|>
+      parseIf <|>
+      parseCase <|>
+      parseVar <|>
+      failWith "couldn't parse"
+    parseApp s
 
-  parseVar : SynParser
+  covering parseApp : (Monad m, Catchable m String) => Ex Syn -> SynParser m
+  parseApp f = do
+    arg <- maybe (spaces1 *> (parseParenSyn <|> parseBool <|> parseNum <|> parseVar))
+    case arg of
+      Nothing => return f
+      Just x => let [f', x'] = liftExSyns [f, x] in parseApp (E (f' :$ x'))
+
+  covering parseVar : (Monad m, Catchable m String) => SynParser m
   parseVar = E0 . Var <$> guard (\ident => not (elem ident keywords)) parseIdent
 
-  parseBoolKeyword : SynParser
-  parseBoolKeyword =
+  covering parseBool : (Monad m, Catchable m String) => SynParser m
+  parseBool =
     case !parseIdent of
       "true" => return (E0 $ Bool True)
       "false" => return (E0 $ Bool False)
-      "if" => do
-        spaces
-        b <- parseSyn
-        spaces1 *> string "then" *> spaces1
-        t <- parseSyn
-        spaces1 *> string "else" *> spaces1
-        f <- parseSyn
-        let [b', t', f'] = liftExSyns [b, t, f]
-        return (E $ If b' t' f')
-      ident => failWith (ident ++ " isn't a valid identifier")
+      ident => failWith (ident ++ " isn't a bool literal")
 
-  parseAs : SynParser
+  covering parseIf : (Monad m, Catchable m String) => SynParser m
+  parseIf = do
+    string "if" *> spaces1
+    b <- parseSyn
+    spaces1 *> string "then" *> spaces1
+    t <- parseSyn
+    spaces1 *> string "else" *> spaces1
+    f <- parseSyn
+    let [b', t', f'] = liftExSyns [b, t, f]
+    return (E $ If b' t' f')
+
+  covering parseAs : (Monad m, Catchable m String) => SynParser m
   parseAs = do
     E t <- parseVariant <|>
-      parseApp <|>
       parseParenSyn <|>
       parseLam <|>
       parseLamRec <|>
       parseLet <|>
       parseNum <|>
-      parseBoolKeyword <|>
+      parseBool <|>
+      parseIf <|>
       parseCase <|>
       parseVar
     spaces *> token ':' *> spaces
     ty <- parseTy
     return (E $ t `As` ty)
 
-  parseNum : SynParser
+  covering parseNum : (Monad m, Catchable m String) => SynParser m
   parseNum = do
     x <- parseFloat
     return (E0 $ Num x)
 
-  parseLam : SynParser
+  covering parseLam : (Monad m, Catchable m String) => SynParser m
   parseLam = do
     token '\\' *> spaces
     var <- parseIdent
@@ -189,7 +201,7 @@ mutual
     E expr <- parseSyn
     return (E $ Lam var ty expr)
 
-  parseLamRec : SynParser
+  covering parseLamRec : (Monad m, Catchable m String) => SynParser m
   parseLamRec = do
     string "fn" *> spaces1
     vf <- parseIdent
@@ -204,12 +216,12 @@ mutual
     E expr <- parseSyn
     return (E $ LamRec vf a v b expr)
 
-  parseLet : SynParser
+  covering parseLet : (Monad m, Catchable m String) => SynParser m
   parseLet = do
     string "let" *> spaces
     parseUnpackingLet <|> parseSimpleLet
   where
-    parseUnpackingLet : SynParser
+    parseUnpackingLet : (Monad m, Catchable m String) => SynParser m
     parseUnpackingLet = do
       vs <- between (token '(') (token ')') (sep1 (spaces *> token ',' *> spaces) parseIdent)
       spaces *> token '=' *> spaces
@@ -219,7 +231,7 @@ mutual
       let [s', t'] = liftSyns [s, t]
       return (E $ Unpack (toVect vs) (liftSyn lteSucc s') t')
 
-    parseSimpleLet : SynParser
+    parseSimpleLet : (Monad m, Catchable m String) => SynParser m
     parseSimpleLet = do
       v <- parseIdent
       spaces *> token '=' *> spaces
@@ -229,7 +241,7 @@ mutual
       let [s', t'] = liftSyns [s, t]
       return (E $ Let v (liftSyn lteSucc s') t')
 
-  parseCase : SynParser
+  covering parseCase : (Monad m, Catchable m String) => SynParser m
   parseCase = do
     string "case" *> spaces1
     s <- parseSyn
@@ -243,51 +255,45 @@ mutual
     spaces *> token '}'
     return (E $ Case s' (zip vs ss'))
 
-  parseVariant : SynParser
+  covering parseVariant : (Monad m, Catchable m String) => SynParser m
   parseVariant = do
     string "variant" *> spaces1
     i <- parseNat
     spaces1
     E s <- parseVariant <|>
-      parseApp <|>
       parseParenSyn <|>
       parseLamRec <|>
       parseLet <|>
       parseLam <|>
       parseNum <|>
-      parseBoolKeyword <|>
+      parseBool <|>
+      parseIf <|>
       parseCase <|>
       parseVar
     return (E $ Variant i s)
 
-  parseParenSyn : SynParser
+  covering parseParenSyn : (Monad m, Catchable m String) => SynParser m
   parseParenSyn = do
     token '(' *> spaces
     expr <- parseSyn
     parseTuple expr <|> parseEndParen expr
   where
-    parseEndParen : Ex Syn -> SynParser
+    parseEndParen : (Monad m, Catchable m String) => Ex Syn -> SynParser m
     parseEndParen expr = do
       spaces *> token ')'
       return expr
 
-    parseTuple : Ex Syn -> SynParser
+    parseTuple : (Monad m, Catchable m String) => Ex Syn -> SynParser m
     parseTuple x = do
       let separator = spaces *> token ',' *> spaces
       xs <- separator *> sep1 separator parseSyn
       token ')'
       return (E $ Tuple (liftExSyns (x :: toVect xs)))
 
-  parseApp : SynParser
-  parseApp = do
-    x <- parseArg
-    xs <- spaces1 *> sep1 spaces1 parseArg
-    return (E $ foldApp (liftExSyns (x :: toVect xs)))
-  where
-    parseArg : SynParser
-    parseArg = choice [parseParenSyn, parseNum, parseBoolKeyword, parseVar]
-
-    foldApp : Vect (S n) (Syn d) -> Syn (n + d)
-    foldApp [s] = s
-    foldApp (s1 :: s2 :: ss) =
-        liftSyn lteSucc (foldApp ((s1 :$ s2) :: ss))
+covering parseDef : (Monad m, Catchable m String) => StringParser m (String, Ex Syn)
+parseDef = do
+  string "def" *> spaces1
+  name <- parseIdent
+  spaces1 *> token '=' *> spaces1
+  s <- parseSyn
+  return (name, s)

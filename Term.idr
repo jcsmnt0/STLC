@@ -8,7 +8,7 @@ import PiVect
 import Ty
 
 import Util.Elem
-import Util.Func
+import Util.Ex
 import Util.Monad
 import Util.Union
 

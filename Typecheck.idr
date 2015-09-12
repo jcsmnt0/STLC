@@ -1,5 +1,6 @@
 module Typecheck
 
+import Control.Catchable
 import Data.Fin
 import Data.Vect
 
@@ -22,7 +23,6 @@ data TypeError
   | Variant
   | LamRec
   | As (Scoped d gv) Ty Ty
-  | Fix
   | CantInfer
   | Case
   | Unpack

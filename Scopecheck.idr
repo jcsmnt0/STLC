@@ -1,5 +1,6 @@
 module Scopecheck
 
+import Control.Catchable
 import Data.Vect
 
 import PiVect
@@ -11,26 +12,27 @@ import Util.Elem
 %default total
 
 scopecheck :
+  (Applicative m, Catchable m String) =>
   (gv : Vect n String) ->
   (s : Syn d) ->
-  Either String (Scoped d gv)
+  m (Scoped d gv)
 
 scopecheck gv (Num x) =
-  return (Num x)
+  pure (Num x)
 
 scopecheck gv (Bool x) =
-  return (Bool x)
+  pure (Bool x)
 
 scopecheck gv (Var x) =
   case decElem x gv of
-    Yes p => return (Var p)
-    No _ => Left ("out of scope: " ++ x)
+    Yes p => pure (Var p)
+    No _ => throw ("out of scope: " ++ x)
 
 scopecheck gv (Lam v ty s) =
-  Lam ty <$> scopecheck (v :: gv) s
+  Lam {v = v} ty <$> scopecheck (v :: gv) s
 
 scopecheck gv (LamRec vf a v b s) =
-  LamRec a b <$> scopecheck (vf :: v :: gv) s
+  LamRec {vf = vf} {v = v} a b <$> scopecheck (vf :: v :: gv) s
 
 scopecheck gv (sx :$ sy) =
   [| scopecheck gv sx :$ scopecheck gv sy |]
@@ -48,21 +50,22 @@ scopecheck gv (Case s ss) =
   Case <$> scopecheck gv s <*> scopecheckCaseVect ss
   where
     scopecheckCaseVect :
+      (Applicative m, Catchable m String) =>
       (xs : Vect n (String, Syn d)) ->
-      Either String (PiVect (\v => Scoped d (v :: gv)) (map fst xs))
-    scopecheckCaseVect [] = Right []
+      m (PiVect (\v => Scoped d (v :: gv)) (map fst xs))
+    scopecheckCaseVect [] = pure []
     scopecheckCaseVect {n = S n} ((v, s) :: ss) =
       -- I'm pretty sure this is terminating because d is decreasing, but the typechecker doesn't see it
       [| assert_total (scopecheck (v :: gv) s) :: scopecheckCaseVect ss |]
 
 scopecheck gv (Unpack vs s t) =
-  Unpack <$> scopecheck gv s <*> scopecheck (vs ++ gv) t
+  Unpack {vs = vs} <$> scopecheck gv s <*> scopecheck (vs ++ gv) t
 
 scopecheck gv (s `As` ty) =
-  return (!(scopecheck gv s) `As` ty)
+  flip As ty <$> scopecheck gv s
 
 scopecheck gv (Let v s t) =
-  Let <$> scopecheck gv s <*> scopecheck (v :: gv) t
+  Let {v = v} <$> scopecheck gv s <*> scopecheck (v :: gv) t
 
 unscope : Scoped d gv -> Syn d
 unscope (Var {v = v} _) = Var v
