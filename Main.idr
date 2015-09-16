@@ -1,6 +1,7 @@
 module Main
 
 import Control.Catchable
+import Control.Monad.Identity
 import Data.Vect
 
 import Interpreter
@@ -20,7 +21,7 @@ import Util.Either
 import Util.Ex
 import Util.Monad
 
-covering re : String -> Either String (Ex Val)
+covering re : String -> EitherT (Either String TypeError) Identity (Ex Val)
 re src = do
   E s <- execParser parseSyn src
   interpretSyn [] [] s
@@ -31,8 +32,8 @@ rep = do
   if src == "exit"
     then return True
     else
-      case re src of
-        Left err => putStrLn err *> return False
+      case runIdentity $ runEitherT $ re src of
+        Left err => putStrLn (either id show err) *> return False
         Right (E {x = a} t) => putStrLn (show t ++ " : " ++ show a) *> return False
 
 covering repl : IO ()

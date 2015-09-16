@@ -62,14 +62,14 @@ namespace Term
 
     Lam :
       String ->
-      Term d (b :: g) a ->
-      Term (S d) g (b :-> a)
+      Term d (a :: g) b ->
+      Term (S d) g (a :-> b)
 
     LamRec :
       String ->
       String ->
-      Term d ((b :-> a) :: b :: g) a ->
-      Term (S d) g (b :-> a)
+      Term d ((a :-> b) :: a :: g) b ->
+      Term (S d) g (a :-> b)
 
     (:$) :
       Term d g (b :-> a) ->
