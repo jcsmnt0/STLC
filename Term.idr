@@ -4,7 +4,7 @@ import Data.Fin
 import Data.Vect
 
 import Partial
-import PiVect
+import PVect
 import Ty
 
 import Util.Elem
@@ -27,7 +27,7 @@ namespace Term
       Term d g Num
 
     Tuple :
-      PiVect (Term d g) as ->
+      PVect (Term d g) as ->
       Term (S d) g (Tuple as)
 
     Variant :
@@ -39,7 +39,7 @@ namespace Term
       {as : Vect n Ty} ->
       Term d g (Sum as) ->
       Vect n String ->
-      PiVect (\a => Term d (a :: g) b) as ->
+      PVect (\a => Term d (a :: g) b) as ->
       Term (S d) g b
 
     Unpack :
@@ -51,8 +51,8 @@ namespace Term
     Prim :
       (as : Vect n Ty) ->
       (b : Ty) ->
-      (f : PiVect toType as -> Partial (toType b)) ->
-      PiVect (Term d g) as ->
+      (f : PVect toType as -> Partial (toType b)) ->
+      PVect (Term d g) as ->
       Term (S d) g b
 
     Var :
@@ -93,7 +93,7 @@ namespace Val
       Val Num
 
     Tuple :
-      PiVect Val as ->
+      PVect Val as ->
       Val (Tuple as)
 
     Variant :
@@ -103,14 +103,14 @@ namespace Val
 
     Cls :
       String ->
-      PiVect Val g ->
+      PVect Val g ->
       Term d (a :: g) b ->
       Val (a :-> b)
     
     ClsRec :
       String ->
       String ->
-      PiVect Val g ->
+      PVect Val g ->
       Term d ((a :-> b) :: a :: g) b ->
       Val (a :-> b)
 
@@ -139,11 +139,11 @@ mutual
   unreflect {a = a :-> b} f =
     Cls {d = 1} "<unreflected value>" [] (Prim [a] b (\[x] => f x) [Var "<unreflected var>" Here])
 
-  evalPiVect : PiVect Val g -> PiVect (Term d g) as -> Partial (PiVect Val as)
-  evalPiVect p = sequence . mapId (eval p)
+  evalPVect : PVect Val g -> PVect (Term d g) as -> Partial (PVect Val as)
+  evalPVect p = sequence . mapId (eval p)
 
   eval :
-    PiVect Val g ->
+    PVect Val g ->
     Term d g a ->
     Partial (Val a)
 
@@ -154,7 +154,7 @@ mutual
     Now (Num x)
 
   eval {g = g} p (Tuple xs) =
-    Tuple <$> evalPiVect p xs
+    Tuple <$> evalPVect p xs
 
   eval p (Variant e t) =
     Variant e <$> eval p t
@@ -162,7 +162,7 @@ mutual
   eval p (Case t vs cs) =
     eval p t >>= evalCase p cs
   where
-    evalCase : PiVect Val g -> PiVect (\a => Term d (a :: g) b) as -> Val (Sum as) -> Partial (Val b)
+    evalCase : PVect Val g -> PVect (\a => Term d (a :: g) b) as -> Val (Sum as) -> Partial (Val b)
     evalCase p (c :: _) (Variant Here v) = Later (eval (v :: p) c)
     evalCase p (_ :: cs) (Variant (There e) v) = evalCase p cs (Variant e v)
 
@@ -171,7 +171,7 @@ mutual
     eval (xs ++ p) tm2
 
   eval p (Prim as b f xs) =
-    unreflect <$> join (f . mapId reflect <$> evalPiVect p xs)
+    unreflect <$> join (f . mapId reflect <$> evalPVect p xs)
 
   eval p (Var v j) =
     Now (indexElem j p)

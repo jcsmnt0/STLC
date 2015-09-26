@@ -8,7 +8,7 @@ import Interpreter
 import ParseSyntax
 import Parser
 import Partial
-import PiVect
+import PVect
 import Primitives
 import Scopecheck
 import Show
@@ -17,11 +17,12 @@ import Term
 import Ty
 import Typecheck
 
+import Util.Catcher
 import Util.Either
 import Util.Ex
 import Util.Monad
 
-covering re : String -> EitherT (Either String TypeError) Identity (Ex Val)
+covering re : String -> Catcher [String, TypeError] (Ex Val)
 re src = do
   E s <- execParser parseSyn src
   interpretSyn [] [] s
@@ -31,17 +32,13 @@ rep = do
   src <- getLine
   if src == "exit"
     then return True
-    else
-      case runIdentity $ runEitherT $ re src of
-        Left err => putStrLn (either id show err) *> return False
-        Right (E {x = a} t) => putStrLn (show t ++ " : " ++ show a) *> return False
+    else (putStrLn $ handle [id, show] $ map show (re src)) *> return False
 
 covering repl : IO ()
 repl = putStrLn "hello\n" *> until id (rep <* putStrLn "") *> return ()
 
 partial main : IO ()
 main = do
-  args <- getArgs
-  case args of
+  case !getArgs of
     [_] => repl
     [_, file] => execFile file

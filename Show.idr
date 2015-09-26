@@ -5,7 +5,7 @@ import Data.Vect
 
 import ParseSyntax
 import Partial
-import PiVect
+import PVect
 import Scopecheck
 import Syntax
 import Term
@@ -57,7 +57,7 @@ strip (LamRec vf v {a = a} {b = b} tm) = LamRec vf a v b (strip tm)
 strip (x :$ y) = strip x :$ strip y
 strip (If b t f) = If (strip b) (strip t) (strip f)
 strip (Tuple xs) = Tuple (mapToVect strip xs)
-strip (Variant {as = as} i tm) = Variant (finToNat (toFin i)) (strip tm) `As` Sum as
+strip (Variant {as = as} i tm) = Variant (finToNat (toFin i)) (strip tm)
 strip (Case s vs ss) = Case (strip s) (zip vs (mapToVect strip ss))
 strip (Unpack vs s t) = Unpack vs (strip s) (strip t)
 strip (Prim _ _ _ _) = Var "<primitive thing>"
@@ -71,7 +71,10 @@ instance Show (Val t) where
   show (Cls {a = a} v p x) = "\\" ++ v ++ ": " ++ show a ++ ". " ++ show (strip x)
   show (ClsRec {a = a} {b = b} vf v p s) = "fn " ++ vf ++ "(" ++ v ++ ": " ++ show a ++ "): " ++ show b ++ ". " ++ show (strip s) ++ ")"
   show (Tuple xs) = "(" ++ sepConcat ", " (mapToVect (\x => show x) xs) ++ ")"
-  show (Variant {as = as} _ x) = "(" ++ show x ++ " : (" ++ sepConcat " | " (map show as) ++ "))"
+  show (Variant {as = as} i x) = "(variant " ++ show (finToNat (toFin i)) ++ " " ++ show x ++ " : (" ++ sepConcat " | " (map show as) ++ "))"
+
+instance Show (Ex Val) where
+  show (E {x = a} t) = show t ++ " : " ++ show a
 
 instance Show TypeError where
   show err = "type error: " ++

@@ -4,7 +4,7 @@ import Control.Catchable
 import Data.Vect
 
 import Parser
-import PiVect
+import PVect
 import Syntax
 import Ty
 
@@ -63,7 +63,7 @@ liftSyn (LTESucc p) (Variant ety s) = Variant ety (liftSyn p s)
 liftSyn (LTESucc p) (Case s ss) = Case (liftSyn p s) (map (\(v, s) => (v, assert_total (liftSyn p s))) ss)
 liftSyn (LTESucc p) (Unpack vs s t) = Unpack vs (liftSyn (LTESucc p) s) (liftSyn p t)
 
-liftSyns : {ds : Vect n Nat} -> (ss : PiVect Syn ds) -> Vect n (Syn (fst (upperBound ds)))
+liftSyns : {ds : Vect n Nat} -> (ss : PVect Syn ds) -> Vect n (Syn (fst (upperBound ds)))
 liftSyns {ds = ds} ss = zipWithToVect liftSyn (snd (upperBound ds)) ss
 
 liftExSyns : (ss : Vect n (Ex Syn)) -> Vect n (Syn (fst (upperBound (map fst ss))))

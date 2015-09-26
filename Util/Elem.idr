@@ -8,6 +8,10 @@ import Util.Vect
 
 %default total
 
+elemToNat : Elem x xs -> Nat
+elemToNat Here = Z
+elemToNat (There p) = S (elemToNat p)
+
 toFin : {xs : Vect n a} -> Elem x xs -> Fin n
 toFin Here = FZ
 toFin (There i) = FS (toFin i)

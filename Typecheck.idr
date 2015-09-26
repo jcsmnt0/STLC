@@ -4,7 +4,7 @@ import Control.Catchable
 import Data.Fin
 import Data.Vect
 
-import PiVect
+import PVect
 import Syntax
 import Term
 import Ty
@@ -29,14 +29,14 @@ namespace TypeError
     | Case
     | Unpack
 
--- todo: ewwwwwwwww
+-- todo: there has to be a better way
 makeCaseTerm :
   (Monad m, Catchable m TypeError) =>
   {as : Vect n Ty} ->
   (p : n = n') ->
   Term d gty (Sum as) ->
   Vect n' String ->
-  PiVect (\a => Term d (a :: gty) b) (replace {P = flip Vect Ty} p as) ->
+  PVect (\a => Term d (a :: gty) b) (replace {P = flip Vect Ty} p as) ->
   Term (S d) gty b
 makeCaseTerm Refl tm vs tms = Case tm vs tms
 
@@ -97,7 +97,7 @@ mutual
     return (E $ Tuple (unzip tms))
 
   typecheck gty (Variant i s) =
-    throw TypeError.Variant -- has to be wrapped in an As
+    throw TypeError.Variant -- has to be wrapped in an As (todo: better inference)
 
   typecheck gty (Variant i s `As` Sum {n = n} as) = do
     E {x = a} tm <- typecheck gty s
@@ -150,8 +150,8 @@ mutual
     (gty : Vect n Ty) ->
     {vs : Vect n' String} ->
     (as : Vect n' Ty) ->
-    PiVect (\v => Scoped d (v :: gv)) vs ->
-    m (b ** PiVect (\a => Term d (a :: gty) b) as)
+    PVect (\v => Scoped d (v :: gv)) vs ->
+    m (b ** PVect (\a => Term d (a :: gty) b) as)
   typecheckCaseVect gty as [] = throw TypeError.Case
   typecheckCaseVect gty [] ss = throw TypeError.Case
   typecheckCaseVect gty [a] [s] = do

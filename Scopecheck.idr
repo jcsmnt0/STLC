@@ -3,7 +3,7 @@ module Scopecheck
 import Control.Catchable
 import Data.Vect
 
-import PiVect
+import PVect
 import Syntax
 import Ty
 
@@ -52,7 +52,7 @@ scopecheck gv (Case s ss) =
     scopecheckCaseVect :
       (Applicative m, Catchable m String) =>
       (xs : Vect n (String, Syn d)) ->
-      m (PiVect (\v => Scoped d (v :: gv)) (map fst xs))
+      m (PVect (\v => Scoped d (v :: gv)) (map fst xs))
     scopecheckCaseVect [] = pure []
     scopecheckCaseVect {n = S n} ((v, s) :: ss) =
       -- I'm pretty sure this is terminating because d is decreasing, but the typechecker doesn't see it
@@ -79,7 +79,7 @@ unscope (Tuple ss) = Tuple (map unscope ss)
 unscope (Variant ty s) = Variant ty (unscope s)
 unscope (Case s ss) = Case (unscope s) (unscopeCaseVect ss)
   where
-    unscopeCaseVect : {vs : Vect n String} -> PiVect (\v => Scoped d (v :: gv)) vs -> Vect n (String, Syn d)
+    unscopeCaseVect : {vs : Vect n String} -> PVect (\v => Scoped d (v :: gv)) vs -> Vect n (String, Syn d)
     unscopeCaseVect [] = []
     -- same thing about totality here as with scopecheckCaseVect
     unscopeCaseVect ((::) {x = v} s ss) = (v, assert_total (unscope s)) :: unscopeCaseVect ss

@@ -1,4 +1,4 @@
-module Main
+module Interpreter
 
 import Control.Catchable
 import Control.Monad.State
@@ -7,7 +7,7 @@ import Data.Vect
 import Parser
 import ParseSyntax
 import Partial
-import PiVect
+import PVect
 import Primitives
 import Scopecheck
 import Show
@@ -16,7 +16,9 @@ import Term
 import Ty
 import Typecheck
 
+import Util.Catcher
 import Util.Either
+import Util.Elem
 import Util.Ex
 
 %default partial
@@ -25,16 +27,16 @@ interpretSyn :
   (Monad m, Catchable m String, Catchable m TypeError) =>
   {as : Vect n Ty} ->
   Vect n String ->
-  PiVect Val as ->
+  PVect Val as ->
   Syn d ->
   m (Ex Val)
 interpretSyn {as = as} names vals s = do
-  db <- scopecheck (names ++ builtinNames) s
-  E {x = a} tm <- typecheck (as ++ builtinTys) db
+  sc <- scopecheck (names ++ builtinNames) s
+  E {x = a} tm <- typecheck (as ++ builtinTys) sc
   return $ E $ impatience $ eval (vals ++ builtinVals) tm
 
 Env : Type
-Env = Ex $ \n => (Vect n String, (as : Vect n Ty ** PiVect Val as))
+Env = Ex $ \n => (Vect n String, (as : Vect n Ty ** PVect Val as))
 
 nilEnv : Env
 nilEnv = E ([], ([] ** []))
@@ -59,13 +61,16 @@ instance [monadStateT] (MonadTrans t, Monad m, Monad (t m), MonadState s m) => M
   get = lift get
   put = lift . put
 
+Errors : Vect 2 Type
+Errors = [String, TypeError]
+
 Interpreter : Type -> Type
-Interpreter = EitherT (Either String TypeError) $ StateT Env Identity
+Interpreter = CatcherT Errors $ StateT Env Identity
 
-runInterpreter : Env -> Interpreter a -> (Either (Either String TypeError) a, Env)
-runInterpreter env = runIdentity . flip runStateT env . runEitherT
+runInterpreter : Env -> Interpreter a -> (Catcher Errors a, Env)
+runInterpreter env = runIdentity . flip runStateT env . runCatcherT
 
-execInterpreter : Env -> Interpreter a -> Either (Either String TypeError) a
+execInterpreter : Env -> Interpreter a -> Catcher Errors a
 execInterpreter env = fst . runInterpreter env
 
 interpretSrc : String -> Interpreter String
@@ -74,4 +79,4 @@ interpretSrc src = execParser (sep1 spaces1 parseDef) src >>= interpret @{monadS
 
 execFile : String -> IO ()
 -- this is not the most readable thing
-execFile file = readFile file >>= putStrLn . either (either id show) id . execInterpreter nilEnv . interpretSrc
+execFile file = readFile file >>= putStrLn . handle [id, show] . execInterpreter nilEnv . interpretSrc

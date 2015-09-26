@@ -3,7 +3,7 @@ module Syntax
 import Data.Fin
 import Data.Vect
 
-import PiVect
+import PVect
 import Ty
 
 %default total
@@ -45,7 +45,7 @@ namespace Scoped
     If : Scoped d gv -> Scoped d gv -> Scoped d gv -> Scoped (S d) gv
     Tuple : Vect n (Scoped d gv) -> Scoped (S d) gv
     Variant : Nat -> Scoped d gv -> Scoped (S d) gv
-    Case : {vs : Vect n String} -> Scoped d gv -> PiVect (\v => Scoped d (v :: gv)) vs -> Scoped (S d) gv
+    Case : {vs : Vect n String} -> Scoped d gv -> PVect (\v => Scoped d (v :: gv)) vs -> Scoped (S d) gv
     Unpack : {vs : Vect n String} -> Scoped (S d) gv -> Scoped d (vs ++ gv) -> Scoped (S d) gv
     As : Scoped d gv -> Ty -> Scoped d gv
     Let : Scoped (S d) gv -> Scoped d (v :: gv) -> Scoped (S d) gv

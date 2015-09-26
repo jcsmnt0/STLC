@@ -4,7 +4,7 @@ import Data.Fin
 import Data.Vect
 
 import Partial
-import PiVect
+import PVect
 
 import Util.Dec
 import Util.Union
@@ -26,7 +26,7 @@ toType : Ty -> Type
 toType Bool = Bool
 toType Num = Float
 toType (s :-> t) = toType s -> Partial (toType t)
-toType (Tuple tys) = PiVect (assert_total toType) tys
+toType (Tuple tys) = PVect (assert_total toType) tys
 toType (Sum tys) = Union (map (assert_total toType) tys)
 
 instance Requires (Tuple ss = Tuple ts) (ss ~=~ ts) where

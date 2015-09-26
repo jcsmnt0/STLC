@@ -2,10 +2,8 @@ module Parser
 
 import Control.Catchable
 import Data.Vect
-import Control.Monad.Trans
 
 %access public
-
 
 %default partial
 
@@ -21,6 +19,15 @@ instance Sequence String Char where
 
 
 %default total
+
+instance Sequence s Char => Sequence (Nat, s) Char where
+  cons x (n, xs) = (n, cons x xs) -- pointless but rounds out the definition
+
+  uncons (n, xs) =
+    case uncons xs of
+      Just ('\n', xs') => Just ('\n', (S n, xs'))
+      Just (c, xs') => Just (c, (n, xs'))
+      Nothing => Nothing
 
 instance Sequence (List a) a where
   cons = (::)
@@ -71,11 +78,16 @@ instance (Functor m, Sequence s i) => Functor (Parser m e s i) where
 instance (Monad m, Catchable m e, Sequence s i) => Applicative (Parser m e s i) where
   pure x = MkParser $ \i => return (MkResult x i)
 
-  -- this could be implemented with just Applicative m
   p <*> q = MkParser $ \i => do
     MkResult op i' <- runParser p i
     MkResult oq i'' <- runParser q i'
     return (MkResult (op oq) i'')
+
+instance (Monad m, Catchable m e, Sequence s i) => Monad (Parser m e s i) where
+  g >>= f = MkParser $ \i => do
+    MkResult o i' <- runParser g i
+    MkResult o' i'' <- runParser (f o) i'
+    return (MkResult o' i'')
 
 failWith : (Catchable m e, Sequence s i) => e -> Parser m e s i o
 failWith err = MkParser (const (throw err))
@@ -103,12 +115,6 @@ instance (Monad m, Catchable m e, Sequence s i, ParseError e) => Alternative (Pa
 
 choice : (Monad m, Catchable m e, Sequence s i, ParseError e) => Vect (S n) (Parser m e s i o) -> Parser m e s i o
 choice ps = foldl1 (<|>) ps
-
-instance (Monad m, Catchable m e, Sequence s i) => Monad (Parser m e s i) where
-  g >>= f = MkParser $ \i => do
-    MkResult o i' <- runParser g i
-    MkResult o' i'' <- runParser (f o) i'
-    return (MkResult o' i'')
 
 noop : (Monad m, Catchable m e, Sequence s i, Monoid o) => Parser m e s i o
 noop = neutral

@@ -51,24 +51,3 @@ instance Monad m => Catchable (EitherT e m) e where
     case x' of
       Right x'' => x
       Left x'' => runEitherT (f x'')
-
--- I should probably be using a more specialized error monad type instead of this, it's going to get messy
-instance Monad m => Catchable (EitherT (Either a b) m) a where
-  throw = throw . Left
-
-  catch (ET x) f = ET $ do
-    x' <- x
-    case x' of
-      Right x'' => x
-      Left (Left x'') => runEitherT (f x'')
-      Left (Right x'') => x
-
-instance Monad m => Catchable (EitherT (Either a b) m) b where
-  throw = throw . Right
-
-  catch (ET x) f = ET $ do
-    x' <- x
-    case x' of
-      Right x'' => x
-      Left (Right x'') => runEitherT (f x'')
-      Left (Left x'') => x

@@ -3,7 +3,7 @@ module Primitives
 import Data.Vect
 
 import Partial
-import PiVect
+import PVect
 import Term
 import Ty
 
@@ -75,7 +75,7 @@ eqBool = Prim [Bool, Bool] Bool (\[x, y] => Now $ x == y) [Var "x" (There Here),
 neqBool : Term (S d) (Bool :: Bool :: g) Bool
 neqBool = Prim [Bool, Bool] Bool (\[x, y] => Now $ x /= y) [Var "x" (There Here), Var "y" Here]
 
-builtinTerms : PiVect (Term 4 []) (map snd builtinSigs)
+builtinTerms : PVect (Term 4 []) (map snd builtinSigs)
 builtinTerms =
   [ Lam "x" iszero
   , Lam "x" (Lam "y" plus)
@@ -93,5 +93,5 @@ builtinTerms =
   , Lam "x" (Lam "y" neqBool)
   ]
 
-partial builtinVals : PiVect Val builtinTys
+partial builtinVals : PVect Val builtinTys
 builtinVals = mapId {ps = builtinTys} (impatience . eval []) builtinTerms
