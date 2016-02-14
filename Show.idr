@@ -2,16 +2,17 @@ module Show
 
 import Data.Fin
 import Data.Vect
+import Data.Vect.Quantifiers
 
 import ParseSyntax
 import Partial
-import PVect
 import Scopecheck
 import Syntax
 import Term
 import Ty
 import Typecheck
 
+import Util.All
 import Util.Elem
 import Util.Ex
 import Util.Fin

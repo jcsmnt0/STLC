@@ -1,11 +1,13 @@
 module Primitives
 
 import Data.Vect
+import Data.Vect.Quantifiers
 
 import Partial
-import PVect
 import Term
 import Ty
+
+import Util.All
 
 %default total
 
@@ -75,7 +77,7 @@ eqBool = Prim [Bool, Bool] Bool (\[x, y] => Now $ x == y) (Tuple [Var "x" (There
 neqBool : Term (S (S d)) (Bool :: Bool :: g) Bool
 neqBool = Prim [Bool, Bool] Bool (\[x, y] => Now $ x /= y) (Tuple [Var "x" (There Here), Var "y" Here])
 
-builtinTerms : PVect (Term 4 []) Primitives.builtinTys
+builtinTerms : All (Term 4 []) Primitives.builtinTys
 builtinTerms =
   [ Lam "x" iszero
   , Lam "x" (Lam "y" plus)
@@ -93,5 +95,5 @@ builtinTerms =
   , Lam "x" (Lam "y" neqBool)
   ]
 
-partial builtinVals : PVect Val Primitives.builtinTys
+partial builtinVals : All Val Primitives.builtinTys
 builtinVals = mapId {ps = builtinTys} (impatience . eval []) builtinTerms

@@ -3,11 +3,11 @@ module Interpreter
 import Control.Catchable
 import Control.Monad.State
 import Data.Vect
+import Data.Vect.Quantifiers
 
 import Parser
 import ParseSyntax
 import Partial
-import PVect
 import Primitives
 import Scopecheck
 import Show
@@ -16,6 +16,7 @@ import Term
 import Ty
 import Typecheck
 
+import Util.All
 import Util.Catcher
 import Util.Either
 import Util.Elem
@@ -27,7 +28,7 @@ interpretSyn :
   (Monad m, Catchable m String, Catchable m TypeError) =>
   {as : Vect n Ty} ->
   Vect n String ->
-  PVect Val as ->
+  All Val as ->
   Syn d ->
   m (Ex Val)
 interpretSyn {as = as} names vals s = do
@@ -36,7 +37,7 @@ interpretSyn {as = as} names vals s = do
   return $ E $ impatience $ eval (vals ++ builtinVals) tm
 
 Env : Type
-Env = Ex $ \n => (Vect n String, (as : Vect n Ty ** PVect Val as))
+Env = Ex $ \n => (Vect n String, (as : Vect n Ty ** All Val as))
 
 nilEnv : Env
 nilEnv = E ([], ([] ** []))

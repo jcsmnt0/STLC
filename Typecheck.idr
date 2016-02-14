@@ -3,12 +3,13 @@ module Typecheck
 import Control.Catchable
 import Data.Fin
 import Data.Vect
+import Data.Vect.Quantifiers
 
-import PVect
 import Syntax
 import Term
 import Ty
 
+import Util.All
 import Util.Dec
 import Util.Elem
 import Util.Eq
@@ -36,7 +37,7 @@ makeCaseTerm :
   (p : n = n') ->
   Term d gty (Sum as) ->
   Vect n' String ->
-  PVect (\a => Term d (a :: gty) b) (replace {P = flip Vect Ty} p as) ->
+  All (\a => Term d (a :: gty) b) (replace {P = flip Vect Ty} p as) ->
   Term (S d) gty b
 makeCaseTerm Refl tm vs tms = Case tm vs tms
 
@@ -150,8 +151,8 @@ mutual
     (gty : Vect n Ty) ->
     {vs : Vect n' String} ->
     (as : Vect n' Ty) ->
-    PVect (\v => Scoped d (v :: gv)) vs ->
-    m (b ** PVect (\a => Term d (a :: gty) b) as)
+    All (\v => Scoped d (v :: gv)) vs ->
+    m (b ** All (\a => Term d (a :: gty) b) as)
   typecheckCaseVect gty as [] = throw TypeError.Case
   typecheckCaseVect gty [] ss = throw TypeError.Case
   typecheckCaseVect gty [a] [s] = do

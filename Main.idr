@@ -3,12 +3,12 @@ module Main
 import Control.Catchable
 import Control.Monad.Identity
 import Data.Vect
+import Data.Vect.Quantifiers
 
 import Interpreter
 import ParseSyntax
 import Parser
 import Partial
-import PVect
 import Primitives
 import Scopecheck
 import Show

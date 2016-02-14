@@ -3,8 +3,8 @@ module Util.Catcher
 import Control.Catchable
 import Control.Monad.Trans
 import Data.Vect
+import Data.Vect.Quantifiers
 
-import PVect
 import Util.Elem
 
 %default total
@@ -13,7 +13,7 @@ data Catcher : Vect n Type -> Type -> Type where
   Return : b -> Catcher as b
   Throw : Elem a as -> a -> Catcher as b
 
-handle : PVect (\a => a -> b) as -> Catcher as b -> b
+handle : All (\a => a -> b) as -> Catcher as b -> b
 handle _ (Return x) = x
 handle {as = []} _ (Throw Here x) impossible
 handle (f :: _) (Throw Here x) = f x

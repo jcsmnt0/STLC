@@ -2,11 +2,12 @@ module Term
 
 import Data.Fin
 import Data.Vect
+import Data.Vect.Quantifiers
 
 import Partial
-import PVect
 import Ty
 
+import Util.All
 import Util.Elem
 import Util.Ex
 import Util.Monad
@@ -27,7 +28,7 @@ namespace Term
       Term d g Num
 
     Tuple :
-      PVect (Term d g) as ->
+      All (Term d g) as ->
       Term (S d) g (Tuple as)
 
     Variant :
@@ -39,7 +40,7 @@ namespace Term
       {as : Vect n Ty} ->
       Term d g (Sum as) ->
       Vect n String ->
-      PVect (\a => Term d (a :: g) b) as ->
+      All (\a => Term d (a :: g) b) as ->
       Term (S d) g b
 
     Unpack :
@@ -51,7 +52,7 @@ namespace Term
     Prim :
       (as : Vect n Ty) ->
       (b : Ty) ->
-      (f : PVect Val as -> Partial (Val b)) ->
+      (f : All Val as -> Partial (Val b)) ->
       Term d g (Tuple as) ->
       Term (S d) g b
 
@@ -82,7 +83,7 @@ namespace Term
       Term d g a ->
       Term (S d) g a
 
-eval : PVect Val g -> Term d g a -> Partial (Val a)
+eval : All Val g -> Term d g a -> Partial (Val a)
 
 eval p (Bool x) = Now x
 
@@ -96,7 +97,7 @@ eval {g = g} p (Case t vs cs) = do
   Inj e x <- eval p t
   evalCase e x cs
 where
-  evalCase : Elem a (map Val as) -> a -> PVect (\b => Term d (b :: g) c) as -> Partial (Val c)
+  evalCase : Elem a (map Val as) -> a -> All (\b => Term d (b :: g) c) as -> Partial (Val c)
   evalCase Here x (c :: cs) = eval (x :: p) c
   evalCase (There p) x (c :: cs) = evalCase p x cs
 

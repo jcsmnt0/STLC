@@ -2,9 +2,9 @@ module Ty
 
 import Data.Fin
 import Data.Vect
+import Data.Vect.Quantifiers
 
 import Partial
-import PVect
 
 import Util.Dec
 import Util.Union
@@ -26,7 +26,7 @@ Val : Ty -> Type
 Val Bool = Bool
 Val Num = Double
 Val (s :-> t) = Val s -> Partial (Val t)
-Val (Tuple tys) = PVect (assert_total Val) tys
+Val (Tuple tys) = All (assert_total Val) tys
 Val (Sum tys) = Union (map (assert_total Val) tys)
 
 Requires (Tuple ss = Tuple ts) (ss ~=~ ts) where
