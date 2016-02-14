@@ -50,7 +50,7 @@ interpret [] = return "nothing to interpret"
 interpret [(_, E s)] = do
   E (names, (as ** vals)) <- get
   E {x = a} v <- interpretSyn names vals s
-  return (show v ++ " : " ++ show a)
+  return (showVal v ++ " : " ++ show a)
 interpret ((name, E s) :: ss) = do
   E (names, (as ** vals)) <- get
   E {x = a} v <- interpretSyn names vals s

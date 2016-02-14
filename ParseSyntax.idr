@@ -52,16 +52,16 @@ liftSyn p (Var v) = Var v
 liftSyn p (Num x) = Num x
 liftSyn p (Bool x) = Bool x
 liftSyn p (As s a) = As (liftSyn p s) a
-liftSyn p (sx :$ sy) = liftSyn p sx :$ liftSyn p sy
-liftSyn (LTESucc p) (Let v s t) = Let v (liftSyn (LTESucc p) s) (liftSyn p t)
+liftSyn (LTESucc p) (sx :$ sy) = liftSyn p sx :$ liftSyn p sy
+liftSyn (LTESucc (LTESucc p)) (Let v s t) = Let v (liftSyn (LTESucc p) s) (liftSyn p t)
 liftSyn (LTESucc p) (LamRec vf a v b s) = LamRec vf a v b (liftSyn p s)
 liftSyn (LTESucc p) (Lam v ty s) = Lam v ty (liftSyn p s)
 liftSyn (LTESucc p) (If sb st sf) = If (liftSyn p sb) (liftSyn p st) (liftSyn p sf)
 liftSyn (LTESucc p) (Tuple ss) = Tuple (map (liftSyn p) ss)
 liftSyn (LTESucc p) (Variant ety s) = Variant ety (liftSyn p s)
 -- m is definitely decreasing in the recursive call here, I'm not sure why it's not picked up as total
-liftSyn (LTESucc p) (Case s ss) = Case (liftSyn p s) (map (\(v, s) => (v, assert_total (liftSyn p s))) ss)
-liftSyn (LTESucc p) (Unpack vs s t) = Unpack vs (liftSyn (LTESucc p) s) (liftSyn p t)
+liftSyn (LTESucc p) (Case s ss) = Case (liftSyn p s) (map (\(v, s) => (v, assert_total liftSyn p s)) ss)
+liftSyn (LTESucc p) (Unpack vs s t) = Unpack vs (liftSyn p s) (liftSyn p t)
 
 liftSyns : {ds : Vect n Nat} -> (ss : PVect Syn ds) -> Vect n (Syn (fst (upperBound ds)))
 liftSyns {ds = ds} ss = zipWithToVect liftSyn (snd (upperBound ds)) ss
@@ -229,7 +229,7 @@ mutual
       spaces1 *> string "in" *> spaces1
       E t <- parseSyn
       let [s', t'] = liftSyns [s, t]
-      return (E $ Unpack (toVect vs) (liftSyn lteSucc s') t')
+      return (E $ Unpack (toVect vs) s' t')
 
     parseSimpleLet : (Monad m, Catchable m String) => SynParser m
     parseSimpleLet = do

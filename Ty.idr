@@ -22,12 +22,12 @@ data Ty
   | Sum (Vect n Ty)
   | (:->) Ty Ty
 
-toType : Ty -> Type
-toType Bool = Bool
-toType Num = Double
-toType (s :-> t) = toType s -> Partial (toType t)
-toType (Tuple tys) = PVect (assert_total toType) tys
-toType (Sum tys) = Union (map (assert_total toType) tys)
+Val : Ty -> Type
+Val Bool = Bool
+Val Num = Double
+Val (s :-> t) = Val s -> Partial (Val t)
+Val (Tuple tys) = PVect (assert_total Val) tys
+Val (Sum tys) = Union (map (assert_total Val) tys)
 
 Requires (Tuple ss = Tuple ts) (ss ~=~ ts) where
   because contra Refl = contra Refl

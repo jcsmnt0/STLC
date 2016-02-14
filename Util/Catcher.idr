@@ -39,7 +39,7 @@ catchElem Here (Throw Here x) f = Just (f x)
 catchElem {b = b} (There p) (Throw (There q) x) f = catchElem p (Throw {b = b} q x) f
 catchElem _ _ _ = Nothing
 
-class Element (n : Nat) (x : a) (xs : Vect n a) where
+interface Element (n : Nat) (x : a) (xs : Vect n a) where
   somewhere : Elem x xs
 
 Element (S n) x (x :: xs) where

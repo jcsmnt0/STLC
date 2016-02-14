@@ -21,14 +21,14 @@ namespace Syn
     Bool : Bool -> Syn d
     Lam : String -> Ty -> Syn d -> Syn (S d)
     LamRec : String -> Ty -> String -> Ty -> Syn d -> Syn (S d)
-    (:$) : Syn d -> Syn d -> Syn d
+    (:$) : Syn d -> Syn d -> Syn (S d)
     If : Syn d -> Syn d -> Syn d -> Syn (S d)
     Tuple : Vect n (Syn d) -> Syn (S d)
     Variant : Nat -> Syn d -> Syn (S d)
     Case : Syn d -> Vect n (String, Syn d) -> Syn (S d)
-    Unpack : Vect n String -> Syn (S d) -> Syn d -> Syn (S d)
+    Unpack : Vect n String -> Syn d -> Syn d -> Syn (S d)
     As : Syn d -> Ty -> Syn d
-    Let : String -> Syn (S d) -> Syn d -> Syn (S d) -- Let is really a special case of Unpack
+    Let : String -> Syn (S d) -> Syn d -> Syn (S (S d)) -- Let is really a special case of Unpack
 
   depth : Syn d -> Nat
   depth {d = d} _ = d
@@ -41,11 +41,11 @@ namespace Scoped
     Bool : Bool -> Scoped d gv
     Lam : Ty -> Scoped d (v :: gv) -> Scoped (S d) gv
     LamRec : Ty -> Ty -> Scoped d (vf :: v :: gv) -> Scoped (S d) gv
-    (:$) : Scoped d gv -> Scoped d gv -> Scoped d gv
+    (:$) : Scoped d gv -> Scoped d gv -> Scoped (S d) gv
     If : Scoped d gv -> Scoped d gv -> Scoped d gv -> Scoped (S d) gv
     Tuple : Vect n (Scoped d gv) -> Scoped (S d) gv
     Variant : Nat -> Scoped d gv -> Scoped (S d) gv
     Case : {vs : Vect n String} -> Scoped d gv -> PVect (\v => Scoped d (v :: gv)) vs -> Scoped (S d) gv
-    Unpack : {vs : Vect n String} -> Scoped (S d) gv -> Scoped d (vs ++ gv) -> Scoped (S d) gv
+    Unpack : {vs : Vect n String} -> Scoped d gv -> Scoped d (vs ++ gv) -> Scoped (S d) gv
     As : Scoped d gv -> Ty -> Scoped d gv
-    Let : Scoped (S d) gv -> Scoped d (v :: gv) -> Scoped (S d) gv
+    Let : Scoped (S d) gv -> Scoped d (v :: gv) -> Scoped (S (S d)) gv

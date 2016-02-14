@@ -45,7 +45,7 @@ makeUnpackTerm :
   {as : Vect n Ty} ->
   (p : n = n') ->
   Vect n' String ->
-  Term (S d) gty (Tuple as) ->
+  Term d gty (Tuple as) ->
   Term d (replace {P = flip Vect Ty} p as ++ gty) b ->
   Term (S d) gty b
 makeUnpackTerm Refl vs s t = Unpack vs s t
@@ -142,7 +142,7 @@ mutual
     (gty : Vect n Ty) ->
     Vect n' (Scoped d gv) ->
     m (Vect n' (Ex (Term d gty)))
-  typecheckVect gty scs = sequence (map (assert_total (typecheck gty)) scs)
+  typecheckVect gty scs = sequence (map (typecheck gty) scs)
 
   typecheckCaseVect :
     (Monad m, Catchable m TypeError) =>

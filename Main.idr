@@ -32,7 +32,7 @@ rep = do
   src <- getLine
   if src == "exit"
     then return True
-    else (putStrLn $ handle [id, show] $ map show (re src)) *> return False
+    else (putStrLn $ handle [id, show] $ map showExVal (re src)) *> return False
 
 covering repl : IO ()
 repl = putStrLn "hello\n" *> until id (rep <* putStrLn "") *> return ()
