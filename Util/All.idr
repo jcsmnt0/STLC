@@ -15,8 +15,7 @@ namespace All
   [] ++ ys = ys
   (x :: xs) ++ ys = x :: xs ++ ys
 
-  -- "map fst xs" causes a problem - log as a bug?
-  unzip : (xs : Vect n (Ex p)) -> All p (map (\x => fst x) xs)
+  unzip : (xs : Vect n (Ex p)) -> All p (map Ex.fst xs)
   unzip [] = []
   unzip (E x :: xs) = x :: unzip xs
 

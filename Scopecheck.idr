@@ -52,7 +52,7 @@ scopecheck gv (Case s ss) =
     scopecheckCaseVect :
       (Applicative m, Catchable m String) =>
       (xs : Vect n (String, Syn d)) ->
-      m (All (\v => Scoped d (v :: gv)) (map (\x => fst x) xs))
+      m (All (\v => Scoped d (v :: gv)) (map Basics.fst xs))
     scopecheckCaseVect [] = pure []
     scopecheckCaseVect {n = S n} ((v, s) :: ss) =
       -- I'm pretty sure this is terminating because d is decreasing, but the typechecker doesn't see it
