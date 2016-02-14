@@ -36,7 +36,7 @@ map : (f : a -> b) -> Elem x xs -> Elem (f x) (map f xs)
 map _ Here = Here
 map f (There p) = There (map f p)
 
-instance Uninhabited (Elem x []) where
+Uninhabited (Elem x []) where
   uninhabited Here impossible
 
 notElem : Not (x = y) -> Not (Elem x ys) -> Not (Elem x (y :: ys))

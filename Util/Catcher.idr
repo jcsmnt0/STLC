@@ -19,18 +19,18 @@ handle {as = []} _ (Throw Here x) impossible
 handle (f :: _) (Throw Here x) = f x
 handle (_ :: fs) (Throw (There p) x) = handle fs (Throw p x)
 
-instance Functor (Catcher as) where
+Functor (Catcher as) where
   map f (Return x) = Return (f x)
   map _ (Throw p x) = Throw p x
 
-instance Applicative (Catcher as) where
+Applicative (Catcher as) where
   pure = Return
 
   (Return f) <*> (Return x) = Return (f x)
   (Throw p x) <*> _ = Throw p x
   _ <*> (Throw p x) = Throw p x
 
-instance Monad (Catcher as) where
+Monad (Catcher as) where
   (Return x) >>= f = f x
   (Throw p x) >>= _ = Throw p x
 
@@ -42,13 +42,13 @@ catchElem _ _ _ = Nothing
 class Element (n : Nat) (x : a) (xs : Vect n a) where
   somewhere : Elem x xs
 
-instance Element (S n) x (x :: xs) where
+Element (S n) x (x :: xs) where
   somewhere = Here
 
-instance Element (S n) x xs => Element (S (S n)) x (y :: xs) where
+Element (S n) x xs => Element (S (S n)) x (y :: xs) where
   somewhere = There somewhere
 
-instance Element n a as => Catchable (Catcher as) a where
+Element n a as => Catchable (Catcher as) a where
   throw = Throw somewhere -- just on the floor or whatever
   catch x = fromMaybe x . catchElem somewhere x
 
@@ -56,23 +56,23 @@ record CatcherT (as : Vect n Type) (m : Type -> Type) (b : Type) where
   constructor CT
   runCatcherT : m (Catcher as b)
 
-instance MonadTrans (CatcherT as) where
+MonadTrans (CatcherT as) where
   lift = CT . map Return
 
-instance Functor m => Functor (CatcherT as m) where
+Functor m => Functor (CatcherT as m) where
   map f = CT . map (map f) . runCatcherT
 
-instance Applicative m => Applicative (CatcherT as m) where
+Applicative m => Applicative (CatcherT as m) where
   pure = CT . pure . Return
   (CT f) <*> (CT x) = CT [| f <*> x |]
 
-instance Monad m => Monad (CatcherT as m) where
+Monad m => Monad (CatcherT as m) where
   (CT x) >>= f = CT $ do
     case !x of
       Return x' => runCatcherT (f x')
       Throw p x' => return (Throw p x')
 
-instance (Element n a as, Monad m) => Catchable (CatcherT as m) a where
+(Element n a as, Monad m) => Catchable (CatcherT as m) a where
   throw = CT . pure . throw
 
   -- I think this can be done with just Applicative

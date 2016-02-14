@@ -19,7 +19,7 @@ import Util.Monoid
 
 %default partial -- should be %default covering but that doesn't exist?
 
-instance Show Ty where
+Show Ty where
   show Bool = "Bool"
   show Num = "Num"
   show (Tuple tys) = "(" ++ sepConcat ", " (map show tys) ++ ")"
@@ -28,7 +28,7 @@ instance Show Ty where
   show (s :-> t) = show s ++ " -> " ++ show t
 
 -- this probably gets parentheses wrong sometimes
-instance Show (Syn d) where
+Show (Syn d) where
   show (Var v) = v
   show (Num x) = show x
   show (Bool x) = if x then "true" else "false"
@@ -62,10 +62,10 @@ strip (Case s vs ss) = Case (strip s) (zip vs (mapToVect strip ss))
 strip (Unpack vs s t) = Unpack vs (strip s) (strip t)
 strip (Prim _ _ _ _) = Var "<primitive thing>"
 
-instance Show (Term d gty t) where
+Show (Term d gty t) where
   show {t = t} tm = show (strip tm)
 
-instance Show (Val t) where
+Show (Val t) where
   show (Bool x) = show x
   show (Num x) = show x
   show (Cls {a = a} v p x) = "\\" ++ v ++ ": " ++ show a ++ ". " ++ show (strip x)
@@ -73,10 +73,10 @@ instance Show (Val t) where
   show (Tuple xs) = "(" ++ sepConcat ", " (mapToVect (\x => show x) xs) ++ ")"
   show (Variant {as = as} i x) = "(variant " ++ show (finToNat (toFin i)) ++ " " ++ show x ++ " : (" ++ sepConcat " | " (map show as) ++ "))"
 
-instance Show (Ex Val) where
+Show (Ex Val) where
   show (E {x = a} t) = show t ++ " : " ++ show a
 
-instance Show TypeError where
+Show TypeError where
   show err = "type error: " ++
     case err of
       App => "app"

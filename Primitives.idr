@@ -27,10 +27,10 @@ builtinSigs =
   , ("/=", Bool :-> Bool :-> Bool)
   ]
 
-builtinNames : Vect (length builtinSigs) String
+builtinNames : Vect (length Primitives.builtinSigs) String
 builtinNames = map fst builtinSigs
 
-builtinTys : Vect (length builtinSigs) Ty
+builtinTys : Vect (length Primitives.builtinSigs) Ty
 builtinTys = map snd builtinSigs
 
 iszero : Term (S d) (Num :: g) Bool
@@ -75,7 +75,7 @@ eqBool = Prim [Bool, Bool] Bool (\[x, y] => Now $ x == y) [Var "x" (There Here),
 neqBool : Term (S d) (Bool :: Bool :: g) Bool
 neqBool = Prim [Bool, Bool] Bool (\[x, y] => Now $ x /= y) [Var "x" (There Here), Var "y" Here]
 
-builtinTerms : PVect (Term 4 []) (map snd builtinSigs)
+builtinTerms : PVect (Term 4 []) Primitives.builtinTys
 builtinTerms =
   [ Lam "x" iszero
   , Lam "x" (Lam "y" plus)
@@ -93,5 +93,5 @@ builtinTerms =
   , Lam "x" (Lam "y" neqBool)
   ]
 
-partial builtinVals : PVect Val builtinTys
+partial builtinVals : PVect Val Primitives.builtinTys
 builtinVals = mapId {ps = builtinTys} (impatience . eval []) builtinTerms

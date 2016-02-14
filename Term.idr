@@ -23,7 +23,7 @@ namespace Term
       Term d g Bool
 
     Num :
-      Float ->
+      Double ->
       Term d g Num
 
     Tuple :
@@ -89,7 +89,7 @@ namespace Val
       Val Bool
 
     Num :
-      Float ->
+      Double ->
       Val Num
 
     Tuple :
@@ -115,15 +115,16 @@ namespace Val
       Val (a :-> b)
 
 mutual
-  -- I think at least some of these assert_totals go away if Ty is tagged with its depth
+  -- I think at least some of the need for assert_total here goes away if Ty is tagged with its depth
+  %assert_total
   reflect : Val a -> toType a
   reflect {a = Bool} (Bool x) = x
   reflect {a = Num} (Num x) = x
-  reflect {a = Tuple as} (Tuple xs) = mapId (assert_total reflect) xs
+  reflect {a = Tuple as} (Tuple xs) = mapId reflect xs
   reflect {a = Sum []} (Variant p t) = absurd p
   reflect {a = Sum (a :: as)} (Variant Here t) = Inj Here (reflect t)
   reflect {a = Sum (a :: as)} (Variant (There p) t) =
-    let Inj p x = assert_total (reflect (Variant p t)) in
+    let Inj p x = reflect (Variant p t) in
       Inj (There p) x
   reflect {a = a :-> b} (Cls v p tm) = \x => reflect <$> eval (unreflect x :: p) tm
   reflect {a = a :-> b} cls@(ClsRec f v p tm) = \x => reflect <$> Later (eval (cls :: unreflect x :: p) tm)

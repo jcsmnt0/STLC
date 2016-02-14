@@ -17,7 +17,7 @@ namespace Syn
   ||| otherwise things like "map (scopecheck gv)" don't pass as total.
   data Syn : (d : Nat) -> Type where
     Var : String -> Syn d
-    Num : Float -> Syn d
+    Num : Double -> Syn d
     Bool : Bool -> Syn d
     Lam : String -> Ty -> Syn d -> Syn (S d)
     LamRec : String -> Ty -> String -> Ty -> Syn d -> Syn (S d)
@@ -37,7 +37,7 @@ namespace Scoped
   ||| Terms that are well-scoped under gv, i.e. ones that don't contain any Var subterms with unbound identifiers.
   data Scoped : (d : Nat) -> (gv : Vect n String) -> Type where
     Var : Elem v gv -> Scoped d gv
-    Num : Float -> Scoped d gv
+    Num : Double -> Scoped d gv
     Bool : Bool -> Scoped d gv
     Lam : Ty -> Scoped d (v :: gv) -> Scoped (S d) gv
     LamRec : Ty -> Ty -> Scoped d (vf :: v :: gv) -> Scoped (S d) gv

@@ -1,6 +1,6 @@
 module Util.Dec
 
-instance Show a => Show (Dec a) where
+Show a => Show (Dec a) where
   show (Yes x) = "Yes " ++ show x
   show (No _) = "No"
 
@@ -8,7 +8,7 @@ infixl 4 =?
 (=?) : DecEq a => (x, y : a) -> Dec (x = y)
 (=?) = decEq
 
-class Requires a b where
+interface Requires a b where
   because : Not b -> Not a
 
 map : Requires b a => (a -> b) -> Dec a -> Dec b

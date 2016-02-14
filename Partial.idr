@@ -25,17 +25,17 @@ impatience (Later x) = impatience x
 never : Partial a
 never = Later never
 
-instance Functor Partial where
+Functor Partial where
   map f (Now x) = Now (f x)
   map f (Later x) = Later (map f x)
 
-instance Applicative Partial where
+Applicative Partial where
   pure = Now
 
   (Now f) <*> x = map f x
   (Later f) <*> x = Later (f <*> x)
 
-instance Monad Partial where
+Monad Partial where
   (Now x) >>= f = f x
   (Later x) >>= f = Later (x >>= f)
 
@@ -87,11 +87,11 @@ namespace PartialT
     Now : m a -> PartialT m a
     Later : PartialT m a -> PartialT m a
 
-instance Functor f => Functor (PartialT f) where
+Functor f => Functor (PartialT f) where
   map f (Now x) = Now (map f x)
   map f (Later x) = Later (map f x)
 
-instance Applicative f => Applicative (PartialT f) where
+Applicative f => Applicative (PartialT f) where
   pure = Now . pure
 
   (Now f) <*> (Now x) = Now (f <*> x)
@@ -103,7 +103,7 @@ namespace inTime
     Now : (x : a) -> InTime (Now x) n
     Later : InTime x_ n -> InTime (Later x_) (S n)
 
-instance Uninhabited (InTime (Later _) 0) where
+Uninhabited (InTime (Later _) 0) where
   uninhabited (Later _) impossible
 
 safeImpatience : {x_ : Partial a} -> (n : Nat) -> InTime x_ n -> a

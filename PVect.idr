@@ -19,7 +19,8 @@ namespace PVect
   [] ++ ys = ys
   (x :: xs) ++ ys = x :: xs ++ ys
 
-  unzip : (xs : Vect n (Ex p)) -> PVect p (map fst xs)
+  -- "map fst xs" causes a problem - log as a bug?
+  unzip : (xs : Vect n (Ex p)) -> PVect p (map (\x => fst x) xs)
   unzip [] = []
   unzip (E x :: xs) = x :: unzip xs
 

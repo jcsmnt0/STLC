@@ -11,16 +11,16 @@ toVect : (xs : List a) -> Vect (length xs) a
 toVect [] = []
 toVect (x :: xs) = x :: toVect xs
 
-instance Uninhabited (Vect.Nil ~=~ x :: the (Vect m a) xs) where
+Uninhabited (Vect.Nil ~=~ x :: the (Vect m a) xs) where
   uninhabited Refl impossible
 
-instance Uninhabited (x :: the (Vect m a) xs ~=~ Vect.Nil) where
+Uninhabited (x :: the (Vect m a) xs ~=~ Vect.Nil) where
   uninhabited Refl impossible
 
-instance Requires (x :: the (Vect m a) xs = y :: the (Vect n a) ys) (x = y) where
+Requires (x :: the (Vect m a) xs = y :: the (Vect n a) ys) (x = y) where
   because contra Refl = contra Refl
 
-instance Requires (x :: the (Vect m a) xs = y :: the (Vect n a) ys) (xs ~=~ ys) where
+Requires (x :: the (Vect m a) xs = y :: the (Vect n a) ys) (xs ~=~ ys) where
   because contra Refl = contra Refl
 
 namespace Vect

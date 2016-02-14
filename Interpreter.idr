@@ -57,7 +57,7 @@ interpret ((name, E s) :: ss) = do
   put (E $ (name :: names, (a :: as ** v :: vals)))
   interpret ss
 
-instance [monadStateT] (MonadTrans t, Monad m, Monad (t m), MonadState s m) => MonadState s (t m) where
+[monadStateT] (MonadTrans t, Monad m, Monad (t m), MonadState s m) => MonadState s (t m) where
   get = lift get
   put = lift . put
 
@@ -78,5 +78,6 @@ interpretSrc : String -> Interpreter String
 interpretSrc src = execParser (sep1 spaces1 parseDef) src >>= interpret @{monadStateT}
 
 execFile : String -> IO ()
--- this is not the most readable thing
-execFile file = readFile file >>= putStrLn . handle [id, show] . execInterpreter nilEnv . interpretSrc
+execFile file = do
+  Right src <- readFile file | Left err => putStrLn ("IO error: " ++ show err)
+  putStrLn $ handle [id, show] $ execInterpreter nilEnv $ interpretSrc src

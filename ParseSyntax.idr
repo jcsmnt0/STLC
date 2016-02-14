@@ -120,10 +120,10 @@ parseNat = do
   xs <- many1 (match isDigit)
   return (cast {to = Nat} $ cast {to = Int} $ pack xs)
 
-covering parseFloat : (Monad m, Catchable m String) => StringParser m Float
-parseFloat = do
+covering parseDouble : (Monad m, Catchable m String) => StringParser m Double
+parseDouble = do
   xs <- many1 (match isDigit)
-  return (cast {to = Float} $ pack xs)
+  return (cast {to = Double} $ pack xs)
 
 mutual
   covering parseSyn : (Monad m, Catchable m String) => SynParser m
@@ -188,7 +188,7 @@ mutual
 
   covering parseNum : (Monad m, Catchable m String) => SynParser m
   parseNum = do
-    x <- parseFloat
+    x <- parseDouble
     return (E0 $ Num x)
 
   covering parseLam : (Monad m, Catchable m String) => SynParser m

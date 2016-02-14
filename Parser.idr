@@ -8,11 +8,11 @@ import Data.Vect
 %default partial
 
 -- resolution only works if I specify that it's not dependent on e - why?
-class Sequence s e | s where
+interface Sequence s e | s where
   cons : e -> s -> s
   uncons : s -> Maybe (e, s)
 
-instance Sequence String Char where
+Sequence String Char where
   cons = strCons
   uncons "" = Nothing
   uncons str = Just (assert_total (strHead str), assert_total (strTail str))
@@ -20,7 +20,7 @@ instance Sequence String Char where
 
 %default total
 
-instance Sequence s Char => Sequence (Nat, s) Char where
+Sequence s Char => Sequence (Nat, s) Char where
   cons x (n, xs) = (n, cons x xs) -- pointless but rounds out the definition
 
   uncons (n, xs) =
@@ -29,7 +29,7 @@ instance Sequence s Char => Sequence (Nat, s) Char where
       Just (c, xs') => Just (c, (n, xs'))
       Nothing => Nothing
 
-instance Sequence (List a) a where
+Sequence (List a) a where
   cons = (::)
   uncons [] = Nothing
   uncons (x :: xs) = Just (x, xs)
@@ -37,10 +37,10 @@ instance Sequence (List a) a where
 data Result : Type -> Type -> Type where
   MkResult : o -> s -> Result s o
 
-instance Show o => Show (Result s o) where
+Show o => Show (Result s o) where
   show (MkResult x _) = show x
 
-instance Functor (Result i) where
+Functor (Result i) where
   map f (MkResult x sf) = MkResult (f x) sf
 
 output : Result i o -> o
@@ -51,10 +51,10 @@ data Parser : (Type -> Type) -> Type -> Type -> Type -> Type -> Type where
 
 -- this is so the library parsers can throw strings as errors while letting higher level parsers use other kinds
 -- of values as errors
-class ParseError e where
+interface ParseError e where
   fromString : String -> e
 
-instance ParseError String where
+ParseError String where
   fromString = id
 
 runParser : Catchable m e => Parser m e s i o -> s -> m (Result s o)
@@ -63,19 +63,19 @@ runParser (MkParser f) = f
 execParser : (Functor m, Catchable m e) => Parser m e s i o -> s -> m o
 execParser f xs = map output (runParser f xs)
 
-instance (Monad m, Catchable m e, Sequence s i, Semigroup o) => Semigroup (Parser m e s i o) where
+(Monad m, Catchable m e, Sequence s i, Semigroup o) => Semigroup (Parser m e s i o) where
   p <+> q = MkParser $ \i => do
     MkResult op i' <- runParser p i
     MkResult oq i'' <- runParser q i'
     return (MkResult (op <+> oq) i'')
 
-instance (Monad m, Catchable m e, Sequence s i, Monoid o) => Monoid (Parser m e s i o) where
+(Monad m, Catchable m e, Sequence s i, Monoid o) => Monoid (Parser m e s i o) where
   neutral = MkParser $ \i => return (MkResult neutral i)
 
-instance (Functor m, Sequence s i) => Functor (Parser m e s i) where
+(Functor m, Sequence s i) => Functor (Parser m e s i) where
   map f (MkParser g) = MkParser $ \i => map f <$> g i
 
-instance (Monad m, Catchable m e, Sequence s i) => Applicative (Parser m e s i) where
+(Monad m, Catchable m e, Sequence s i) => Applicative (Parser m e s i) where
   pure x = MkParser $ \i => return (MkResult x i)
 
   p <*> q = MkParser $ \i => do
@@ -83,7 +83,7 @@ instance (Monad m, Catchable m e, Sequence s i) => Applicative (Parser m e s i) 
     MkResult oq i'' <- runParser q i'
     return (MkResult (op oq) i'')
 
-instance (Monad m, Catchable m e, Sequence s i) => Monad (Parser m e s i) where
+(Monad m, Catchable m e, Sequence s i) => Monad (Parser m e s i) where
   g >>= f = MkParser $ \i => do
     MkResult o i' <- runParser g i
     MkResult o' i'' <- runParser (f o) i'
@@ -109,7 +109,7 @@ private rethrowStr :
   Parser m e s i o
 rethrowStr x = propagate ((fromString x) <+>)
 
-instance (Monad m, Catchable m e, Sequence s i, ParseError e) => Alternative (Parser m e s i) where
+(Monad m, Catchable m e, Sequence s i, ParseError e) => Alternative (Parser m e s i) where
   empty = throwStr "empty"
   f <|> g = MkParser $ \i => catch {t = e} (runParser f i) (const (runParser g i))
 

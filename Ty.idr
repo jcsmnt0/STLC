@@ -24,24 +24,24 @@ data Ty
 
 toType : Ty -> Type
 toType Bool = Bool
-toType Num = Float
+toType Num = Double
 toType (s :-> t) = toType s -> Partial (toType t)
 toType (Tuple tys) = PVect (assert_total toType) tys
 toType (Sum tys) = Union (map (assert_total toType) tys)
 
-instance Requires (Tuple ss = Tuple ts) (ss ~=~ ts) where
+Requires (Tuple ss = Tuple ts) (ss ~=~ ts) where
   because contra Refl = contra Refl
 
-instance Requires (Sum ss = Sum ts) (ss ~=~ ts) where
+Requires (Sum ss = Sum ts) (ss ~=~ ts) where
   because contra Refl = contra Refl
 
-instance Requires (s :-> t = s' :-> t') (s = s') where
+Requires (s :-> t = s' :-> t') (s = s') where
   because contra Refl = contra Refl
 
-instance Requires (s :-> t = s' :-> t') (t = t') where
+Requires (s :-> t = s' :-> t') (t = t') where
   because contra Refl = contra Refl
 
-instance DecEq Ty where
+DecEq Ty where
   decEq Bool Bool = Yes Refl
 
   decEq Num Num = Yes Refl
