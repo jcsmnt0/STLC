@@ -49,7 +49,7 @@ All subject to change on a whim, or even possibly for good reasons.
     - The first argument to `variant` indicates which variant of the sum type is being constructed - i.e. a sum type is a list of types, and the first argument is an index into that list. This is to allow sum types with multiple variants of the same type: `variant 0 true : (Bool | Bool)` is distinct from `variant 1 true : (Bool | Bool)`.
   - Casing
     - Assuming `x : (Num | Bool)`, `case x of { \a: Num. iszero a; \b: Bool => b } : Bool`
-    - Curly braces contain a a list of functions whose argument types correspond to the components of the sum type in order
+    - Curly braces contain a semicolon-separated list of functions whose argument types correspond to the components of the sum type in order
     - Semicolon after the last branch is optional
 
 # How to build
