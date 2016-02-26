@@ -1,6 +1,7 @@
 module Show
 
 import Data.Fin
+import Data.HVect
 import Data.Vect
 import Data.Vect.Quantifiers
 
@@ -14,15 +15,16 @@ import Typecheck
 
 import Util.All
 import Util.Elem
+import Util.Eq
 import Util.Ex
 import Util.Fin
 import Util.Union
 
 %default total
 
-Show Ty where
-  show Bool = "Bool"
-  show Num = "Num"
+Show SynTy where
+  show NUM = "Num"
+  show (Sum [Tuple [], Tuple []]) = "Bool"
   show (Tuple tys) = "(" ++ concat (intersperse ", " (map (assert_total show) tys)) ++ ")"
   show (Sum tys) = "(" ++ concat (intersperse " | " (map (assert_total show) tys)) ++ ")"
   show ((s :-> t) :-> r) = "(" ++ show (s :-> t) ++ ")" ++ " -> " ++ show r
@@ -44,53 +46,38 @@ Show (Syn d) where
   show (If b t f) = "if " ++ show b ++ " then " ++ show t ++ " else " ++ show f
   show (Tuple xs) = "(" ++ concat (intersperse ", " (map show xs)) ++ ")"
   show (Variant i s) = "variant " ++ show i ++ " " ++ show s
-  show (Case s ss) = "case " ++ show s ++ " of { " ++ concat (intersperse "; " (map (\(v, s) => v ++ " => " ++ show ss) ss))
+  show (Case s ss) = "case " ++ show s ++ " of { " ++ concat (intersperse "; " (map show ss)) ++ " }"
   show (Let v s t) = "let " ++ v ++ " = " ++ show s ++ " in " ++ show t
   show (Unpack vs s t) = "let (" ++ concat (intersperse ", " vs) ++ ") = " ++ show s ++ " in " ++ show t
   show (s `As` ty) = "(" ++ show s ++ " : " ++ show ty ++ ")"
 
-total strip : Term d gty t -> Syn d
-strip (Bool x) = Bool x
-strip (Num x) = Num x
-strip (Var v _) = Var v
-strip (Lam v {b = b} x) = Lam v b (strip x)
-strip (LamRec vf v {a = a} {b = b} tm) = LamRec vf a v b (strip tm)
-strip (x :$ y) = strip x :$ strip y
-strip (If b t f) = If (strip b) (strip t) (strip f)
-strip (Tuple xs) = Tuple (mapToVect strip xs)
-strip (Variant {as = as} i tm) = Variant (finToNat (toFin i)) (strip tm)
-strip (Case s vs ss) = Case (strip s) (zip vs (mapToVect strip ss))
-strip (Unpack vs s t) = Unpack vs (strip s) (strip t)
-strip (Prim _ _ _ _) = Var "<primitive thing>"
-
-Show (Term d gty t) where
-  show {t = t} tm = show (strip tm)
-
 mutual
-  showTuple : Val (Tuple as) -> String
-  showTuple xs = "(" ++ concat (intersperse ", " (mapToVect (assert_total showVal) xs)) ++ ")"
+  showTuple : (as : Vect n SynTy) -> SynVal e (Tuple as) -> String
+  showTuple as xs = "(" ++ showTuple' as xs ++ ")"
+    where
+      showTuple' : (as : Vect n SynTy) -> SynVal e (Tuple as) -> String
+      showTuple' [] [] = ""
+      showTuple' [a] [x] = assert_total (showVal a x)
+      showTuple' (a :: as) (x :: xs) = assert_total (showVal a x) ++ ", " ++ showTuple' as xs
   
-  showSum : Nat -> Val (Sum as) -> String
-  showSum {as = a :: as} i (Inj Here x) = Foldable.concat $ the (List String)
-    [ "(variant "
-    , show i
-    , " "
-    , assert_total (showVal x)
-    , " : ("
-    , concat (intersperse " | " (map show (a :: as)))
-    , "))"
-    ]
-  showSum {as = a :: as} i (Inj (There p) x) = showSum (S i) (Inj p x)
-  
-  showVal : Val a -> String
-  showVal {a = Bool} x = show x
-  showVal {a = Num} x = show x
-  showVal {a = Tuple as} xs = showTuple xs
-  showVal {a = Sum as} x = showSum 0 x
-  showVal {a = a :-> b} f = "function"
+  -- this is wrong (it strips off leading types)
+  showSum : (as : Vect n SynTy) -> Nat -> SynVal e (Sum as) -> String
+  showSum as i xs = concat $ the (List String) ["(variant ", show i, " ", showSum' as xs, ")"]
+    where
+      showSum' : (as : Vect n SynTy) -> SynVal e (Sum as) -> String
+      showSum' (a :: _) (Inj Here x) = assert_total (showVal a x)
+      showSum' (_ :: as) (Inj (There p) x) = showSum' as (Inj p x)
 
-showExVal : Ex Val -> String
-showExVal (E {x = a} x) = showVal x ++ " : " ++ show a
+  showVal : (a : _) -> SynVal e a -> String
+  showVal NUM x = show x
+  showVal (Tuple as) xs = showTuple as xs
+  showVal (Sum [Tuple [], Tuple []]) (Inj Here []) = "true"
+  showVal (Sum [Tuple [], Tuple []]) (Inj (There Here) []) = "false"
+  showVal (Sum as) x = showSum as 0 x
+  showVal (a :-> b) f = "function"
+
+showExVal : Ex (SynVal e) -> String
+showExVal (E {x = a} x) = showVal a x ++ " : " ++ show a
 
 Show TypeError where
   show err = "type error: " ++

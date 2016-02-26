@@ -11,6 +11,26 @@ toVect : (xs : List a) -> Vect (length xs) a
 toVect [] = []
 toVect (x :: xs) = x :: toVect xs
 
+mapIdNeutral : {xs : Vect n a} -> map Basics.id xs = xs
+mapIdNeutral {xs = []} = Refl
+mapIdNeutral {xs = _ :: _} = cong mapIdNeutral
+
+mapDistributesOverAppend : {xs : Vect m a} -> map f (xs ++ ys) = map f xs ++ map f ys
+mapDistributesOverAppend {xs = []} = Refl
+mapDistributesOverAppend {xs = _ :: _} = cong mapDistributesOverAppend
+
+indexDistributesOverMap : {xs : Vect n a} -> index i (map f xs) = f (index i xs)
+indexDistributesOverMap {xs = _ :: _} {i = FZ} = Refl
+indexDistributesOverMap {xs = _ :: _} {i = FS _} = indexDistributesOverMap
+
+mapFstZipLemma : map Basics.fst (Vect.zip xs ys) = xs
+mapFstZipLemma {xs = []} {ys = []} = Refl
+mapFstZipLemma {xs = _ :: _} {ys = _ :: _} = cong mapFstZipLemma
+
+mapSndZipLemma : map Basics.snd (Vect.zip xs ys) = ys
+mapSndZipLemma {xs = []} {ys = []} = Refl
+mapSndZipLemma {xs = _ :: _} {ys = _ :: _} = cong mapSndZipLemma
+
 Uninhabited (Vect.Nil ~=~ x :: the (Vect m a) xs) where
   uninhabited Refl impossible
 

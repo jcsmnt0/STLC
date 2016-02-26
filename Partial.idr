@@ -1,4 +1,6 @@
-module Control.Monad.Partial
+module Partial
+
+import Util.Monad
 
 %default total
 
@@ -39,19 +41,11 @@ Monad Partial where
   (Now x) >>= f = f x
   (Later x) >>= f = Later (x >>= f)
 
-lemma : Delay (Force x) = x
-lemma = Refl
-
 namespace strictPartialEq
   infixl 5 =~=
   codata (=~=) : Partial a -> Partial a -> Type where
     Now : Now x =~= Now x
     Later : x =~= y -> Later x =~= Later y
-
-  -- id : (x : Partial a) -> x =~= x
-  -- id (Now _) = Now
-  -- id (Later x) = replace {P = \x => Later x =~= Later x} (sym lemma) (strictPartialEq.Later (id x))
-  -- id Fail = e
 
 namespace partialEq
   infixl 5 ~~

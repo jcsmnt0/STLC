@@ -1,85 +1,148 @@
 module Ty
 
 import Data.Fin
+import Data.HVect
 import Data.Vect
 import Data.Vect.Quantifiers
 
 import Partial
+import Syntax
 
+import Util.All
 import Util.Dec
+import Util.Elem
+import Util.Eq
+import Util.Fin
 import Util.Union
 import Util.Vect
 
 %default total
 
--- it seems like it's possible to tag Tys with depth like Terms and other things and avoid the assert_total calls,
--- but it gets to be a really big hassle.
-infixr 2 :->
-data Ty
-  = Bool
-  | Num
-  | Tuple (Vect n Ty)
-  | Sum (Vect n Ty)
-  | (:->) Ty Ty
+infixr 10 :->
+infixr 9 :@
 
-Val : Ty -> Type
-Val Bool = Bool
-Val Num = Double
-Val (s :-> t) = Val s -> Partial (Val t)
-Val (Tuple tys) = All (assert_total Val) tys
-Val (Sum tys) = Union (map (assert_total Val) tys)
+data Ty : Nat -> Type where
+  C : Type -> Ty l
+  Var : Fin l -> Ty l
+  (:->) : Ty l -> Ty l -> Ty l
+  Tuple : Vect n (Ty l) -> Ty l
+  Sum : Vect n (Ty l) -> Ty l
 
-Requires (Tuple ss = Tuple ts) (ss ~=~ ts) where
-  because contra Refl = contra Refl
+VOID : Ty l
+VOID = Sum []
 
-Requires (Sum ss = Sum ts) (ss ~=~ ts) where
-  because contra Refl = contra Refl
+UNIT : Ty l
+UNIT = Tuple []
 
-Requires (s :-> t = s' :-> t') (s = s') where
-  because contra Refl = contra Refl
+BOOL : Ty l
+BOOL = Sum [UNIT, UNIT]
 
-Requires (s :-> t = s' :-> t') (t = t') where
-  because contra Refl = contra Refl
+NUM : Ty l
+NUM = C Nat
 
-DecEq Ty where
-  decEq Bool Bool = Yes Refl
+LAZY : Ty l -> Ty l
+LAZY a = UNIT :-> a
 
-  decEq Num Num = Yes Refl
+%name Ty a, b, c
 
-  decEq (Tuple ss) (Tuple ts) with (assert_total (ss =? ts))
-    decEq (Tuple ss) (Tuple ss) | Yes Refl = Yes Refl
-    decEq (Tuple ss) (Tuple ts) | No contra = No (because contra)
+fromSynTy : SynTy -> Ty.Ty l
+fromSynTy NUM = NUM
+fromSynTy (a :-> b) = fromSynTy a :-> fromSynTy b
+fromSynTy (Tuple as) = Tuple $ map (assert_total fromSynTy) as
+fromSynTy (Sum as) = Sum $ map (assert_total fromSynTy) as
 
-  decEq (Sum ss) (Sum ts) with (assert_total (ss =? ts))
-    decEq (Sum ss) (Sum ss) | Yes Refl = Yes Refl
-    decEq (Sum ss) (Sum ts) | No contra = No (because contra)
+namespace Ty
+  -- this is (roughly) automatically implicit because it's a special name
+  fromInteger : (x : Integer) -> {default ItIsJust p : IsJust (integerToFin x l)} -> Ty l
+  fromInteger x {p = p} = Var $ fromInteger {prf = p} x
 
-  decEq (s :-> t) (s' :-> t') with (s =? s', t =? t')
-    decEq (s :-> t) (s :-> t) | (Yes Refl, Yes Refl) = Yes Refl
-    decEq (s :-> t) (s' :-> t') | (No contra, _) = No (because contra)
-    decEq (s :-> t) (s' :-> t') | (_, No contra) = No (because contra)
+  sub : (Fin l -> Ty d') -> Ty l -> Ty d'
+  sub f (C a) = C a
+  sub f (Var i) = f i
+  sub f (a :-> b) = sub f a :-> sub f b
+  sub f (Tuple as) = Tuple $ map (assert_total $ sub f) as
+  sub f (Sum as) = Sum $ map (assert_total $ sub f) as
 
-  decEq Bool Num = No (\Refl impossible)
-  decEq Bool (Tuple xs) = No (\Refl impossible)
-  decEq Bool (Sum xs) = No (\Refl impossible)
-  decEq Bool (x :-> y) = No (\Refl impossible)
+  weakenN : (n : Nat) -> Ty l -> Ty (n + l)
+  weakenN n = sub (Var . shift n)
 
-  decEq Num Bool = No (\Refl impossible)
-  decEq Num (Tuple xs) = No (\Refl impossible)
-  decEq Num (Sum xs) = No (\Refl impossible)
-  decEq Num (x :-> y) = No (\Refl impossible)
+  weaken : Ty l -> Ty (S l)
+  weaken = weakenN 1
 
-  decEq (Tuple ts) Num = No (\Refl impossible)
-  decEq (Tuple ts) Bool = No (\Refl impossible)
-  decEq (Tuple ss) (Sum ts) = No (\Refl impossible)
-  decEq (Tuple ts) (x :-> y) = No (\Refl impossible)
+  betaSub : Ty l -> Fin (S l) -> Ty l
+  betaSub a FZ = a
+  betaSub a (FS i) = Var i
 
-  decEq (Sum ts) Num = No (\Refl impossible)
-  decEq (Sum ts) Bool = No (\Refl impossible)
-  decEq (Sum ss) (Tuple ts) = No (\Refl impossible)
-  decEq (Sum ts) (x :-> y) = No (\Refl impossible)
+  (:@) : Ty (S l) -> Ty l -> Ty l
+  (:@) a b = sub (betaSub b) a
 
-  decEq (x :-> y) Num = No (\Refl impossible)
-  decEq (x :-> y) (Tuple xs) = No (\Refl impossible)
-  decEq (x :-> y) (Sum xs) = No (\Refl impossible)
-  decEq (x :-> y) Bool = No (\Refl impossible)
+  Ctx : Nat -> Nat -> Type
+  Ctx l n = Vect n (Ty l)
+
+  mutual
+    weakenApplyCancel : a = weaken a :@ b
+    weakenApplyCancel {a = C a} = Refl
+    weakenApplyCancel {a = Var FZ} = Refl
+    weakenApplyCancel {a = Var (FS _)} = Refl
+    weakenApplyCancel {a = a :-> b} = cong2 {f = \a', b' => a' :-> b'} weakenApplyCancel weakenApplyCancel
+    weakenApplyCancel {a = Tuple as} {b = b} = cong $ assert_total $ weakenApplyCancelVect as b
+    weakenApplyCancel {a = Sum as} {b = b} = cong $ assert_total $ weakenApplyCancelVect as b
+
+    weakenApplyCancelVect : (as : Ty.Ctx _ _) -> (b : _) -> as = map (:@ b) (map Ty.weaken as)
+    weakenApplyCancelVect [] b = Refl
+    weakenApplyCancelVect (a :: as) b = cong2 weakenApplyCancel (weakenApplyCancelVect as b)
+
+namespace Ctx
+  weaken : Ctx l n -> Ctx (S l) n
+  weaken = map weaken
+
+Val : Vect l Type -> Ty l -> Type
+Val e (C a) = a
+Val e (Var i) = index i e
+Val e (a :-> b) = Val e a -> Partial (Val e b)
+Val e (Tuple as) = HVect (map (assert_total $ Val e) as)
+Val e (Sum as) = Union (map (assert_total $ Val e) as)
+
+normalize : Vect l Type -> Ty l -> Ty l
+normalize e = C . Val e
+
+namespace Val
+  mutual
+    betaValLemma : Val e (a :@ b) = Val (Val e b :: e) a
+    betaValLemma {a = C a} = Refl
+    betaValLemma {a = Var FZ} = Refl
+    betaValLemma {a = Var (FS _)} = Refl
+    betaValLemma {a = a :-> b} = cong2 {f = \a', b' => a' -> Partial b'} betaValLemma betaValLemma
+    betaValLemma {a = Tuple as} = cong $ assert_total betaValTupleLemma
+    betaValLemma {a = Sum as} = cong $ assert_total betaValSumLemma
+
+    betaValTupleLemma : {as : Ty.Ctx _ _} -> map (Val e) (map (:@ b) as) = map (Val (Val e b :: e)) as
+    betaValTupleLemma {as = []} = Refl
+    betaValTupleLemma {as = a :: as} = cong2 betaValLemma betaValTupleLemma
+
+    betaValSumLemma : {as : Ty.Ctx _ _} -> map (Val e) (map (:@ b) as) = map (Val (Val e b :: e)) as
+    betaValSumLemma {as = []} = Refl
+    betaValSumLemma {as = a :: as} = cong2 betaValLemma betaValSumLemma
+
+  -- reduction at the type level, not term level
+  betaReduceTy : Val e (a :@ b) -> Val (Val e b :: e) a
+  betaReduceTy = replace' betaValLemma
+
+  betaExpandTy : Val (Val e b :: e) a -> Val e (a :@ b)
+  betaExpandTy = replace' (sym betaValLemma)
+
+  weakenValLemma : Val e a = Val (b :: e) (Ty.weaken a)
+  weakenValLemma {b = b} = Eq.trans (cong weakenApplyCancel) (betaValLemma {b = C b})
+
+  weaken : Val e a -> Val (b :: e) (weaken a)
+  weaken = replace' weakenValLemma
+
+  strengthen : Val (b :: e) (weaken a) -> Val e a
+  strengthen = replace' (sym weakenValLemma)
+
+Env : Vect l Type -> Ctx l n -> Type
+Env e = All (Val e)
+
+namespace Env
+  weaken : {e : Vect l Type} -> {g : Ctx l n} -> Env e g -> Env (a :: e) (Ctx.weaken g)
+  weaken = map Ty.weaken Val.weaken

@@ -6,7 +6,6 @@ import Data.Vect.Quantifiers
 
 import Parser
 import Syntax
-import Ty
 
 import Util.All
 import Util.Ex
@@ -20,7 +19,7 @@ SynParser : (Type -> Type) -> Type
 SynParser m = StringParser m (Ex Syn)
 
 TyParser : (Type -> Type) -> Type
-TyParser m = StringParser m Ty
+TyParser m = StringParser m SynTy
 
 isLowercaseLetter : Char -> Bool
 isLowercaseLetter c = 'a' <= c && c <= 'z'
@@ -51,29 +50,34 @@ keywords =
 liftSyn : (m `LTE` n) -> Syn m -> Syn n
 liftSyn p (Var v) = Var v
 liftSyn p (Num x) = Num x
-liftSyn p (Bool x) = Bool x
+liftSyn (LTESucc (LTESucc p)) (Bool x) = Bool x
 liftSyn p (As s a) = As (liftSyn p s) a
 liftSyn (LTESucc p) (sx :$ sy) = liftSyn p sx :$ liftSyn p sy
 liftSyn (LTESucc (LTESucc p)) (Let v s t) = Let v (liftSyn (LTESucc p) s) (liftSyn p t)
 liftSyn (LTESucc p) (LamRec vf a v b s) = LamRec vf a v b (liftSyn p s)
 liftSyn (LTESucc p) (Lam v ty s) = Lam v ty (liftSyn p s)
-liftSyn (LTESucc p) (If sb st sf) = If (liftSyn p sb) (liftSyn p st) (liftSyn p sf)
 liftSyn (LTESucc p) (Tuple ss) = Tuple (map (liftSyn p) ss)
 liftSyn (LTESucc p) (Variant ety s) = Variant ety (liftSyn p s)
 -- m is definitely decreasing in the recursive call here, I'm not sure why it's not picked up as total
-liftSyn (LTESucc p) (Case s ss) = Case (liftSyn p s) (map (\(v, s) => (v, assert_total liftSyn p s)) ss)
 liftSyn (LTESucc p) (Unpack vs s t) = Unpack vs (liftSyn p s) (liftSyn p t)
+liftSyn (LTESucc (LTESucc (LTESucc p))) (Case s ss) = Case (liftSyn p s) (map (assert_total liftSyn p) ss)
+
+-- dear god
+liftSyn
+  (LTESucc (LTESucc (LTESucc (LTESucc (LTESucc (LTESucc (LTESucc (LTESucc (LTESucc (LTESucc (LTESucc p)))))))))))
+  (If sb st sf) =
+    If (liftSyn p sb) (liftSyn p st) (liftSyn p sf)
 
 liftSyns : {ds : Vect n Nat} -> (ss : All Syn ds) -> Vect n (Syn (fst (upperBound ds)))
 liftSyns {ds = ds} ss = zipWithToVect liftSyn (snd (upperBound ds)) ss
 
 liftExSyns : (ss : Vect n (Ex Syn)) -> Vect n (Syn (fst (upperBound (map fst ss))))
-liftExSyns ss = liftSyns (unzip ss)
+liftExSyns ss = liftSyns (unzipEx ss)
 
 E0 : b Z -> Ex b
 E0 = E
 
-
+-- I actually want %default covering here but it doesn't exist
 %default partial
 
 covering parseIdent : (Monad m, Catchable m String) => StringParser m String
@@ -90,8 +94,8 @@ parseTy = parseLamRecTy <|> parseParenTy <|> parseBaseTy
     parseBaseTy = do
       ty <- many (match isLowercaseLetter <|> match isUppercaseLetter)
       case pack ty of
-        "Num" => return Num
-        "Bool" => return Bool
+        "Num" => return NUM
+        "Bool" => return BOOL
         ty' => failWith (pack ty ++ " isn't a valid type")
 
     parseParenTy : (Monad m, Catchable m String) => TyParser m
@@ -120,11 +124,6 @@ covering parseNat : (Monad m, Catchable m String) => StringParser m Nat
 parseNat = do
   xs <- many1 (match isDigit)
   return (cast {to = Nat} $ cast {to = Int} $ pack xs)
-
-covering parseDouble : (Monad m, Catchable m String) => StringParser m Double
-parseDouble = do
-  xs <- many1 (match isDigit)
-  return (cast {to = Double} $ pack xs)
 
 mutual
   covering parseSyn : (Monad m, Catchable m String) => SynParser m
@@ -156,8 +155,8 @@ mutual
   covering parseBool : (Monad m, Catchable m String) => SynParser m
   parseBool =
     case !parseIdent of
-      "true" => return (E0 $ Bool True)
-      "false" => return (E0 $ Bool False)
+      "true" => return (E $ Bool {d = 2} True)
+      "false" => return (E $ Bool {d = 2} False)
       ident => failWith (ident ++ " isn't a bool literal")
 
   covering parseIf : (Monad m, Catchable m String) => SynParser m
@@ -169,7 +168,7 @@ mutual
     spaces1 *> string "else" *> spaces1
     f <- parseSyn
     let [b', t', f'] = liftExSyns [b, t, f]
-    return (E $ If b' t' f')
+    return $ E $ If b' t' f'
 
   covering parseAs : (Monad m, Catchable m String) => SynParser m
   parseAs = do
@@ -185,12 +184,12 @@ mutual
       parseVar
     spaces *> token ':' *> spaces
     ty <- parseTy
-    return (E $ t `As` ty)
+    return $ E $ t `As` ty
 
   covering parseNum : (Monad m, Catchable m String) => SynParser m
   parseNum = do
-    x <- parseDouble
-    return (E0 $ Num x)
+    x <- parseNat
+    return $ E0 $ Num x
 
   covering parseLam : (Monad m, Catchable m String) => SynParser m
   parseLam = do
@@ -200,7 +199,7 @@ mutual
     ty <- parseTy
     token '.' *> spaces
     E expr <- parseSyn
-    return (E $ Lam var ty expr)
+    return $ E $ Lam var ty expr
 
   covering parseLamRec : (Monad m, Catchable m String) => SynParser m
   parseLamRec = do
@@ -215,7 +214,7 @@ mutual
     b <- parseTy
     token '.' *> spaces
     E expr <- parseSyn
-    return (E $ LamRec vf a v b expr)
+    return $ E $ LamRec vf a v b expr
 
   covering parseLet : (Monad m, Catchable m String) => SynParser m
   parseLet = do
@@ -230,7 +229,7 @@ mutual
       spaces1 *> string "in" *> spaces1
       E t <- parseSyn
       let [s', t'] = liftSyns [s, t]
-      return (E $ Unpack (toVect vs) s' t')
+      return $ E $ Unpack (toVect vs) s' t'
 
     parseSimpleLet : (Monad m, Catchable m String) => SynParser m
     parseSimpleLet = do
@@ -240,7 +239,7 @@ mutual
       spaces1 *> string "in" *> spaces1
       E t <- parseSyn
       let [s', t'] = liftSyns [s, t]
-      return (E $ Let v (liftSyn lteSucc s') t')
+      return $ E $ Let v (liftSyn lteS s') t'
 
   covering parseCase : (Monad m, Catchable m String) => SynParser m
   parseCase = do
@@ -249,12 +248,10 @@ mutual
     spaces1 *> string "of" *> spaces1
     token '{' *> spaces
     let separator = spaces *> token ';' *> spaces
-    cases <- sep1 separator [| MkPair (parseIdent <* spaces1 <* string "=>" <* spaces1) parseSyn |]
-    maybe separator
-    let (vs, ss) = unzip (toVect cases)
-    let (s' :: ss') = liftExSyns (s :: ss)
-    spaces *> token '}'
-    return (E $ Case s' (zip vs ss'))
+    ss <- sep1 separator parseSyn
+    maybe separator *> spaces *> token '}'
+    let (s' :: ss') = liftExSyns (s :: toVect ss)
+    return $ E $ Case s' ss'
 
   covering parseVariant : (Monad m, Catchable m String) => SynParser m
   parseVariant = do
@@ -271,7 +268,7 @@ mutual
       parseIf <|>
       parseCase <|>
       parseVar
-    return (E $ Variant i s)
+    return $ E $ Variant i s
 
   covering parseParenSyn : (Monad m, Catchable m String) => SynParser m
   parseParenSyn = do
@@ -289,7 +286,7 @@ mutual
       let separator = spaces *> token ',' *> spaces
       xs <- separator *> sep1 separator parseSyn
       token ')'
-      return (E $ Tuple (liftExSyns (x :: toVect xs)))
+      return $ E $ Tuple (liftExSyns (x :: toVect xs))
 
 covering parseDef : (Monad m, Catchable m String) => StringParser m (String, Ex Syn)
 parseDef = do

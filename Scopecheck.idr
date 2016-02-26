@@ -38,25 +38,16 @@ scopecheck gv (sx :$ sy) =
   [| scopecheck gv sx :$ scopecheck gv sy |]
 
 scopecheck gv (If sx sy sz) =
-  If <$> scopecheck gv sx <*> scopecheck gv sy <*> scopecheck gv sz
+  [| If (scopecheck gv sx) (scopecheck gv sy) (scopecheck gv sz) |]
 
 scopecheck gv (Tuple ss) =
-  Tuple <$> sequence (map (scopecheck gv) ss)
+  [| Tuple (sequence (map (scopecheck gv) ss)) |]
 
 scopecheck gv (Variant ty s) =
   Variant ty <$> scopecheck gv s
 
-scopecheck gv (Case s ss) =
-  Case <$> scopecheck gv s <*> scopecheckCaseVect ss
-  where
-    scopecheckCaseVect :
-      (Applicative m, Catchable m String) =>
-      (xs : Vect n (String, Syn d)) ->
-      m (All (\v => Scoped d (v :: gv)) (map Basics.fst xs))
-    scopecheckCaseVect [] = pure []
-    scopecheckCaseVect {n = S n} ((v, s) :: ss) =
-      -- I'm pretty sure this is terminating because d is decreasing, but the typechecker doesn't see it
-      [| assert_total (scopecheck (v :: gv) s) :: scopecheckCaseVect ss |]
+scopecheck gv (Case s ss) = do
+  [| Case (scopecheck gv s) (sequence (map (scopecheck gv) ss)) |]
 
 scopecheck gv (Unpack vs s t) =
   Unpack {vs = vs} <$> scopecheck gv s <*> scopecheck (vs ++ gv) t
@@ -77,12 +68,7 @@ unscope (sx :$ sy) = unscope sx :$ unscope sy
 unscope (If sb st sf) = If (unscope sb) (unscope st) (unscope sf)
 unscope (Tuple ss) = Tuple (map unscope ss)
 unscope (Variant ty s) = Variant ty (unscope s)
-unscope (Case s ss) = Case (unscope s) (unscopeCaseVect ss)
-  where
-    unscopeCaseVect : {vs : Vect n String} -> All (\v => Scoped d (v :: gv)) vs -> Vect n (String, Syn d)
-    unscopeCaseVect [] = []
-    -- same thing about totality here as with scopecheckCaseVect
-    unscopeCaseVect ((::) {x = v} s ss) = (v, assert_total (unscope s)) :: unscopeCaseVect ss
+unscope (Case s ss) = Case (unscope s) (map unscope ss)
 unscope (Unpack {vs = vs} s t) = Unpack vs (unscope s) (unscope t)
 unscope (s `As` ty) = unscope s `As` ty
 unscope (Let {v = v} s t) = Let v (unscope s) (unscope t)

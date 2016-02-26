@@ -2,6 +2,7 @@ module Interpreter
 
 import Control.Catchable
 import Control.Monad.State
+import Data.HVect
 import Data.Vect
 import Data.Vect.Quantifiers
 
@@ -21,42 +22,45 @@ import Util.Catcher
 import Util.Either
 import Util.Elem
 import Util.Ex
+import Util.Monad
 
 %default partial
 
-interpretSyn :
-  (Monad m, Catchable m String, Catchable m TypeError) =>
-  {as : Vect n Ty} ->
-  Vect n String ->
-  All Val as ->
-  Syn d ->
-  m (Ex Val)
-interpretSyn {as = as} names vals s = do
-  sc <- scopecheck (names ++ builtinNames) s
-  E {x = a} tm <- typecheck (as ++ builtinTys) sc
-  return $ E $ impatience $ eval (vals ++ builtinVals) tm
-
 Env : Type
-Env = Ex $ \n => (Vect n String, (as : Vect n Ty ** All Val as))
+Env = Ex $ \n => (Vect n String, Ex (All {n = n} (SynVal [])))
 
-nilEnv : Env
-nilEnv = E ([], ([] ** []))
+covering nilEnv : Env
+nilEnv = E ([], E [])
 
--- todo: this can definitely be less redundant
-interpret :
+covering nilCons : String -> SynVal [] a -> Env -> Env
+nilCons x t (E (xs, E ts)) = E (x :: xs, E (t :: ts))
+
+covering interpretSyn :
+  (Monad m, Catchable m String, Catchable m TypeError) =>
+  Env ->
+  Syn d ->
+  m (Ex (SynVal []))
+interpretSyn (E (names, E {x = as} vals)) t = do
+  t' <- scopecheck (names ++ primitiveNames) t
+  E t'' <- typecheck (as ++ primitiveTys) t'
+  return $ E $ impatience $ eval [] (map fromSynTy id (vals ++ primitiveVals)) t''
+
+covering interpret :
   (MonadState Env m, Catchable m String, Catchable m TypeError, Monad m) =>
   List (String, Ex Syn) ->
-  m String
-interpret [] = return "nothing to interpret"
-interpret [(_, E s)] = do
-  E (names, (as ** vals)) <- get
-  E {x = a} v <- interpretSyn names vals s
-  return (showVal v ++ " : " ++ show a)
-interpret ((name, E s) :: ss) = do
-  E (names, (as ** vals)) <- get
-  E {x = a} v <- interpretSyn names vals s
-  put (E $ (name :: names, (a :: as ** v :: vals)))
-  interpret ss
+  m (Ex (SynVal []))
+interpret [] = return $ E {x = UNIT} $ []
+interpret ((name, E t) :: ts) = do
+  x <- get
+  E t' <- interpretSyn x t
+  modify $ nilCons name t'
+  interpret ts
+
+covering interpretEnv :
+  (MonadState Env m, Catchable m String, Catchable m TypeError, Monad m) =>
+  List (String, Ex Syn) ->
+  m Env
+interpretEnv ts = interpret ts >> get
 
 [monadStateT] (MonadTrans t, Monad m, Monad (t m), MonadState s m) => MonadState s (t m) where
   get = lift get
@@ -68,17 +72,13 @@ Errors = [String, TypeError]
 Interpreter : Type -> Type
 Interpreter = CatcherT Errors $ StateT Env Identity
 
-runInterpreter : Env -> Interpreter a -> (Catcher Errors a, Env)
+covering runInterpreter : Env -> Interpreter a -> (Catcher Errors a, Env)
 runInterpreter env = runIdentity . flip runStateT env . runCatcherT
 
-execInterpreter : Env -> Interpreter a -> Catcher Errors a
+covering execInterpreter : Env -> Interpreter a -> Catcher Errors a
 execInterpreter env = fst . runInterpreter env
 
-interpretSrc : String -> Interpreter String
--- shouldn't Idris be able to find monadStateT in instance search here?
-interpretSrc src = execParser (sep1 spaces1 parseDef) src >>= interpret @{monadStateT}
-
-execFile : String -> IO ()
-execFile file = do
-  Right src <- readFile file | Left err => putStrLn ("IO error: " ++ show err)
-  putStrLn $ handle [id, show] $ execInterpreter nilEnv $ interpretSrc src
+covering interpretSrc : String -> Interpreter String
+interpretSrc src = do
+  defs <- execParser (sep1 spaces1 parseDef) src
+  showExVal <$> the (Interpreter (Ex (SynVal []))) (interpret @{monadStateT} defs)
