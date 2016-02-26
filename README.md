@@ -31,7 +31,7 @@ All subject to change on a whim, or even possibly for good reasons.
   - `\x: Num. + 1 x`
   - Argument type is required
 - Recursive functions
-  - `fn countDown(x: Num): Num. if iszero x then 0 else countDown (- x 1)`
+  - `fn factorial(x: Num): Num. if (|| (== x 0) (== x 1)) then 1 else (* x (factorial (pred x)))`
   - Function name, argument type, and return type are required
 - Tuples
   - Type
