@@ -1,5 +1,5 @@
 # Overview
-This repository contains a parser, scope checker, type checker, and big-step evaluator for simply typed lambda calculus with a few extensions. (The core term language and evaluator actually support universally quantified polymorphic type variables, but there's no syntax or typechecking for that feature yet.) The evaluator is correct by construction with respect to type preservation, which means evaluating a term is guaranteed to produce a value of the same type (or diverge).
+This repository contains a parser, scope checker, type checker, and big-step evaluator for simply typed lambda calculus with a few extensions. (The core term language and evaluator actually support universally quantified variables and substitution at the type level, but there's no syntax or typechecking for that feature yet.) The evaluator is correct by construction with respect to type preservation, which means evaluating a term is guaranteed to produce a value of the same type (or diverge).
 
 I'm developing this mostly as a learning exercise, so it's extremely bare at the moment. That said, the few features it does have are fully usable and run reasonably quickly.
 
