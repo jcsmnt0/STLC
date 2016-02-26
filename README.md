@@ -1,10 +1,10 @@
 # Overview
-This repository contains a parser, scope checker, type checker, and big-step evaluator for simply typed lambda calculus with a few extensions. The evaluator is correct by construction with respect to type preservation, which means evaluating a term is guaranteed to produce a value of the same type (or diverge).
+This repository contains a parser, scope checker, type checker, and big-step evaluator for simply typed lambda calculus with a few extensions. (The core term language and evaluator actually support universally quantified polymorphic type variables, but there's no syntax or typechecking for that feature yet.) The evaluator is correct by construction with respect to type preservation, which means evaluating a term is guaranteed to produce a value of the same type (or diverge).
 
 I'm developing this mostly as a learning exercise, so it's extremely bare at the moment. That said, the few features it does have are fully usable and run reasonably quickly.
 
 # Language Features
-- Built-in types: Num (double-width floating point), Bool
+- Built-in types: Num (natural numbers), Bool
 - Tuple types
 - Sum types
 - General recursion
@@ -13,7 +13,7 @@ I'm developing this mostly as a learning exercise, so it's extremely bare at the
 # Syntax
 All subject to change on a whim, or even possibly for good reasons.
 
-- Identifiers are made up of letters or any of  ``+=<>_!@#$%^&*-|'"?/`~``
+- Identifiers are made up of letters or any of ``+=<>_!@#$%^&*-|'"?/`~``
 - Bool literals
   - `true`, `false`
 - Num literals
@@ -31,7 +31,7 @@ All subject to change on a whim, or even possibly for good reasons.
   - `\x: Num. + 1 x`
   - Argument type is required
 - Recursive functions
-  - `fn countDown (x : Num): Num. if iszero x then 0 else countDown (- x 1)`
+  - `fn countDown(x: Num): Num. if iszero x then 0 else countDown (- x 1)`
   - Function name, argument type, and return type are required
 - Tuples
   - Type
@@ -48,8 +48,8 @@ All subject to change on a whim, or even possibly for good reasons.
     - `variant` always requires an explicit type annotation
     - The first argument to `variant` indicates which variant of the sum type is being constructed - i.e. a sum type is a list of types, and the first argument is an index into that list. This is to allow sum types with multiple variants of the same type: `variant 0 true : (Bool | Bool)` is distinct from `variant 1 true : (Bool | Bool)`.
   - Casing
-    - Assuming `x : (Num | Bool | Bool)`: `case x of { a => iszero a; b => b; c => not c }`
-    - Branches have to be in the same order as the components of the sum type
+    - Assuming `x : (Num | Bool)`: `case x of { \a: Num. iszero a; \b: Bool => b } : Bool`
+    - Curly braces contain a a list of functions whose argument types correspond to the components of the sum type in order
     - Semicolon after the last branch is optional
 
 # How to build
