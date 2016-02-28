@@ -3,16 +3,18 @@ module Primitives
 import Data.Vect
 import Data.Vect.Quantifiers
 
-import Partial
-import Syntax
-import Term
-import Ty
+import Term.Eval
+import Term.Typed
+import Ty.Raw
+import Ty.Scoped
+import Ty.Val
 
 import Util.All
+import Util.Partial
 
 %default total
 
-primitiveSigs : Vect 3 (String, SynTy)
+primitiveSigs : Vect 3 (String, Raw.Ty)
 primitiveSigs =
   [ ("iszero", NUM :-> BOOL)
   , ("suc", NUM :-> NUM)
@@ -22,7 +24,7 @@ primitiveSigs =
 primitiveNames : Vect (length Primitives.primitiveSigs) String
 primitiveNames = map fst primitiveSigs
 
-primitiveTys : Vect (length Primitives.primitiveSigs) SynTy
+primitiveTys : Vect (length Primitives.primitiveSigs) Raw.Ty
 primitiveTys = map snd primitiveSigs
 
 iszero : SynTerm (4 + d) 0 g (NUM :-> BOOL)

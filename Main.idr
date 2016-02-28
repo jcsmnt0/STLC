@@ -1,26 +1,23 @@
 module Main
 
 import Control.Catchable
-import Control.Monad.Identity
 import Control.Monad.State
 import Data.Vect
 import Data.Vect.Quantifiers
 
+import Term.Typecheck
+import Term.Parse
+import Term.Raw
+import Ty.Raw
+import Ty.Scoped
+import Ty.Val
+
 import BuiltIns
 import Interpreter
-import ParseSyntax
-import Parser
-import Partial
-import Primitives
-import Scopecheck
 import Show
-import Syntax
-import Term
-import Ty
-import Typecheck
 
+import Parser
 import Util.Catcher
-import Util.Either
 import Util.Ex
 import Util.Monad
 
@@ -43,7 +40,7 @@ rep = do
   if src == "exit"
     then return True
     else do
-      Just (E t) <- handle' $ execParser parseSyn src | _ => return False
+      Just (E t) <- handle' $ execParser parseTerm src | _ => return False
       Just env <- builtinEnv' | _ => return False
       Just t' <- handle' $ interpretSyn env t | _ => return False
       putStrLn $ showExVal t'

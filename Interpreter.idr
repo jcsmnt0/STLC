@@ -6,23 +6,26 @@ import Data.HVect
 import Data.Vect
 import Data.Vect.Quantifiers
 
-import Parser
-import ParseSyntax
-import Partial
-import Primitives
-import Scopecheck
-import Show
-import Syntax
-import Term
-import Ty
-import Typecheck
+import Term.Eval
+import Term.Parse
+import Term.Raw
+import Term.Scopecheck
+import Term.Scoped
+import Term.Typecheck
+import Term.Typed
+import Ty.Raw
+import Ty.Scoped
+import Ty.Val
 
+import Primitives
+import Show
+
+import Parser
 import Util.All
 import Util.Catcher
-import Util.Either
-import Util.Elem
 import Util.Ex
 import Util.Monad
+import Util.Partial
 
 %default partial
 
@@ -38,16 +41,16 @@ nilCons x t (E (xs, E ts)) = E (x :: xs, E (t :: ts))
 covering interpretSyn :
   (Monad m, Catchable m String, Catchable m TypeError) =>
   Env ->
-  Syn d ->
+  Raw.Term d ->
   m (Ex (SynVal []))
 interpretSyn (E (names, E {x = as} vals)) t = do
   t' <- scopecheck (names ++ primitiveNames) t
   E t'' <- typecheck (as ++ primitiveTys) t'
-  return $ E $ impatience $ eval [] (map fromSynTy id (vals ++ primitiveVals)) t''
+  return $ E $ impatience $ eval [] (map fromRawTy id (vals ++ primitiveVals)) t''
 
 covering interpret :
   (MonadState Env m, Catchable m String, Catchable m TypeError, Monad m) =>
-  List (String, Ex Syn) ->
+  List (String, Ex Raw.Term) ->
   m (Ex (SynVal []))
 interpret [] = return $ E {x = UNIT} $ []
 interpret ((name, E t) :: ts) = do
@@ -58,7 +61,7 @@ interpret ((name, E t) :: ts) = do
 
 covering interpretEnv :
   (MonadState Env m, Catchable m String, Catchable m TypeError, Monad m) =>
-  List (String, Ex Syn) ->
+  List (String, Ex Raw.Term) ->
   m Env
 interpretEnv ts = interpret ts >> get
 

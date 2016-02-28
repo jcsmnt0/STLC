@@ -4,30 +4,29 @@ import Control.Catchable
 import Control.Monad.State
 import Data.Fin
 
+import Term.Raw
+import Term.Parse
+import Term.Typecheck
+import Ty.Raw
+
 import Interpreter
-import Parser
-import ParseSyntax
-import Syntax
-import Typecheck
 
 import Util.Ex
-import Util.Monad
-import Util.Vect
 
 %default partial
 %access public
 
 -- just some arbitrary depth large enough for all of these terms
-E' : Syn 100 -> Ex Syn
+E' : Raw.Term 100 -> Ex Raw.Term
 E' = E
 
-private implicit var : String -> Syn d
+private implicit var : String -> Raw.Term d
 var = Var
 
-private implicit bool : Bool -> Syn (2 + d)
+private implicit bool : Bool -> Raw.Term (2 + d)
 bool = Bool
 
-private fromInteger : (x : Integer) -> {default ItIsJust p : IsJust (integerToFin x l)} -> Syn l
+private fromInteger : (x : Integer) -> {default ItIsJust p : IsJust (integerToFin x l)} -> Raw.Term l
 fromInteger x = Num $ fromInteger x
 
 -- there's probably a way to use dsl notation for Lam
@@ -36,7 +35,7 @@ builtinEnv = interpretEnv
   [ ("idNat", E' $ Lam "x" NUM "x")
 
   , ("+", E' $
-      LamRec "+" NUM "x" (NUM :-> NUM)
+      LamRec "+" "x" NUM (NUM :-> NUM)
         (If
           ("iszero" :$ "x")
           "idNat"
@@ -44,7 +43,7 @@ builtinEnv = interpretEnv
             ("+" :$ ("pred" :$ "x") :$ ("suc" :$ "y")))))
 
   , ("-", E' $
-      LamRec "-" NUM "x" (NUM :-> NUM)
+      LamRec "-" "x" NUM (NUM :-> NUM)
         (Lam "y" NUM
           (If
             ("iszero" :$ "y")
@@ -52,7 +51,7 @@ builtinEnv = interpretEnv
             ("-" :$ ("pred" :$ "x") :$ ("pred" :$ "y")))))
 
   , ("*", E' $
-      LamRec "*" NUM "x" (NUM :-> NUM)
+      LamRec "*" "x" NUM (NUM :-> NUM)
         (Lam "y" NUM
           (If
             ("iszero" :$ "x")
@@ -70,7 +69,7 @@ builtinEnv = interpretEnv
           (If "x" True "y")))
 
   , ("==", E' $
-      LamRec "==" NUM "x" (NUM :-> BOOL)
+      LamRec "==" "x" NUM (NUM :-> BOOL)
         (Lam "y" NUM
           (If
             ("&&" :$ ("iszero" :$ "x") :$ ("iszero" :$ "y"))

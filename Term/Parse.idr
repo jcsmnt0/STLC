@@ -1,12 +1,13 @@
-module ParseSyntax
+module ParseTermtax
 
 import Control.Catchable
 import Data.Vect
 import Data.Vect.Quantifiers
 
-import Parser
-import Syntax
+import Term.Raw
+import Ty.Raw
 
+import Parser
 import Util.All
 import Util.Ex
 import Util.LTE
@@ -15,11 +16,11 @@ import Util.Vect
 
 %default total
 
-SynParser : (Type -> Type) -> Type
-SynParser m = StringParser m (Ex Syn)
+TermParser : (Type -> Type) -> Type
+TermParser m = StringParser m (Ex Term)
 
 TyParser : (Type -> Type) -> Type
-TyParser m = StringParser m SynTy
+TyParser m = StringParser m Ty
 
 isLowercaseLetter : Char -> Bool
 isLowercaseLetter c = 'a' <= c && c <= 'z'
@@ -47,32 +48,31 @@ keywords =
   , "def"
   ]
 
-liftSyn : (m `LTE` n) -> Syn m -> Syn n
-liftSyn p (Var v) = Var v
-liftSyn p (Num x) = Num x
-liftSyn (LTESucc (LTESucc p)) (Bool x) = Bool x
-liftSyn p (As s a) = As (liftSyn p s) a
-liftSyn (LTESucc p) (sx :$ sy) = liftSyn p sx :$ liftSyn p sy
-liftSyn (LTESucc (LTESucc p)) (Let v s t) = Let v (liftSyn (LTESucc p) s) (liftSyn p t)
-liftSyn (LTESucc p) (LamRec vf a v b s) = LamRec vf a v b (liftSyn p s)
-liftSyn (LTESucc p) (Lam v ty s) = Lam v ty (liftSyn p s)
-liftSyn (LTESucc p) (Tuple ss) = Tuple (map (liftSyn p) ss)
-liftSyn (LTESucc p) (Variant ety s) = Variant ety (liftSyn p s)
--- m is definitely decreasing in the recursive call here, I'm not sure why it's not picked up as total
-liftSyn (LTESucc p) (Unpack vs s t) = Unpack vs (liftSyn p s) (liftSyn p t)
-liftSyn (LTESucc (LTESucc (LTESucc p))) (Case s ss) = Case (liftSyn p s) (map (assert_total liftSyn p) ss)
+liftTerm : (m `LTE` n) -> Term m -> Term n
+liftTerm p (Var v) = Var v
+liftTerm p (Num x) = Num x
+liftTerm (LTESucc (LTESucc p)) (Bool x) = Bool x
+liftTerm p (As s a) = As (liftTerm p s) a
+liftTerm (LTESucc p) (sx :$ sy) = liftTerm p sx :$ liftTerm p sy
+liftTerm (LTESucc (LTESucc p)) (Let v s t) = Let v (liftTerm (LTESucc p) s) (liftTerm p t)
+liftTerm (LTESucc p) (LamRec vf a v b s) = LamRec vf a v b (liftTerm p s)
+liftTerm (LTESucc p) (Lam v ty s) = Lam v ty (liftTerm p s)
+liftTerm (LTESucc p) (Tuple ss) = Tuple (map (liftTerm p) ss)
+liftTerm (LTESucc p) (Variant ety s) = Variant ety (liftTerm p s)
+liftTerm (LTESucc p) (Unpack vs s t) = Unpack vs (liftTerm p s) (liftTerm p t)
+liftTerm (LTESucc (LTESucc (LTESucc p))) (Case s ss) = Case (liftTerm p s) (map (liftTerm p) ss)
 
 -- dear god
-liftSyn
+liftTerm
   (LTESucc (LTESucc (LTESucc (LTESucc (LTESucc (LTESucc (LTESucc (LTESucc (LTESucc (LTESucc (LTESucc p)))))))))))
   (If sb st sf) =
-    If (liftSyn p sb) (liftSyn p st) (liftSyn p sf)
+    If (liftTerm p sb) (liftTerm p st) (liftTerm p sf)
 
-liftSyns : {ds : Vect n Nat} -> (ss : All Syn ds) -> Vect n (Syn (fst (upperBound ds)))
-liftSyns {ds = ds} ss = zipWithToVect liftSyn (snd (upperBound ds)) ss
+liftTerms : {ds : Vect n Nat} -> (ss : All Term ds) -> Vect n (Term (fst (upperBound ds)))
+liftTerms {ds = ds} ss = zipWithToVect liftTerm (snd (upperBound ds)) ss
 
-liftExSyns : (ss : Vect n (Ex Syn)) -> Vect n (Syn (fst (upperBound (map fst ss))))
-liftExSyns ss = liftSyns (unzipEx ss)
+liftExTerms : (ss : Vect n (Ex Term)) -> Vect n (Term (fst (upperBound (map fst ss))))
+liftExTerms ss = liftTerms (unzipEx ss)
 
 E0 : b Z -> Ex b
 E0 = E
@@ -126,11 +126,11 @@ parseNat = do
   return (cast {to = Nat} $ cast {to = Int} $ pack xs)
 
 mutual
-  covering parseSyn : (Monad m, Catchable m String) => SynParser m
-  parseSyn = do
+  covering parseTerm : (Monad m, Catchable m String) => TermParser m
+  parseTerm = do
     s <- parseAs <|>
       parseVariant <|>
-      parseParenSyn <|>
+      parseParenTerm <|>
       parseLamRec <|>
       parseLet <|>
       parseLam <|>
@@ -142,38 +142,38 @@ mutual
       failWith "couldn't parse"
     parseApp s
 
-  covering parseApp : (Monad m, Catchable m String) => Ex Syn -> SynParser m
+  covering parseApp : (Monad m, Catchable m String) => Ex Term -> TermParser m
   parseApp f = do
-    arg <- maybe (spaces1 *> (parseParenSyn <|> parseBool <|> parseNum <|> parseVar))
+    arg <- maybe (spaces1 *> (parseParenTerm <|> parseBool <|> parseNum <|> parseVar))
     case arg of
       Nothing => return f
-      Just x => let [f', x'] = liftExSyns [f, x] in parseApp (E (f' :$ x'))
+      Just x => let [f', x'] = liftExTerms [f, x] in parseApp (E (f' :$ x'))
 
-  covering parseVar : (Monad m, Catchable m String) => SynParser m
+  covering parseVar : (Monad m, Catchable m String) => TermParser m
   parseVar = E0 . Var <$> guard (\ident => not (elem ident keywords)) parseIdent
 
-  covering parseBool : (Monad m, Catchable m String) => SynParser m
+  covering parseBool : (Monad m, Catchable m String) => TermParser m
   parseBool =
     case !parseIdent of
       "true" => return (E $ Bool {d = 2} True)
       "false" => return (E $ Bool {d = 2} False)
       ident => failWith (ident ++ " isn't a bool literal")
 
-  covering parseIf : (Monad m, Catchable m String) => SynParser m
+  covering parseIf : (Monad m, Catchable m String) => TermParser m
   parseIf = do
     string "if" *> spaces1
-    b <- parseSyn
+    b <- parseTerm
     spaces1 *> string "then" *> spaces1
-    t <- parseSyn
+    t <- parseTerm
     spaces1 *> string "else" *> spaces1
-    f <- parseSyn
-    let [b', t', f'] = liftExSyns [b, t, f]
+    f <- parseTerm
+    let [b', t', f'] = liftExTerms [b, t, f]
     return $ E $ If b' t' f'
 
-  covering parseAs : (Monad m, Catchable m String) => SynParser m
+  covering parseAs : (Monad m, Catchable m String) => TermParser m
   parseAs = do
     E t <- parseVariant <|>
-      parseParenSyn <|>
+      parseParenTerm <|>
       parseLam <|>
       parseLamRec <|>
       parseLet <|>
@@ -186,22 +186,22 @@ mutual
     ty <- parseTy
     return $ E $ t `As` ty
 
-  covering parseNum : (Monad m, Catchable m String) => SynParser m
+  covering parseNum : (Monad m, Catchable m String) => TermParser m
   parseNum = do
     x <- parseNat
     return $ E0 $ Num x
 
-  covering parseLam : (Monad m, Catchable m String) => SynParser m
+  covering parseLam : (Monad m, Catchable m String) => TermParser m
   parseLam = do
     token '\\' *> spaces
     var <- parseIdent
     spaces *> token ':' *> spaces
     ty <- parseTy
     token '.' *> spaces
-    E expr <- parseSyn
+    E expr <- parseTerm
     return $ E $ Lam var ty expr
 
-  covering parseLamRec : (Monad m, Catchable m String) => SynParser m
+  covering parseLamRec : (Monad m, Catchable m String) => TermParser m
   parseLamRec = do
     string "fn" *> spaces1
     vf <- parseIdent
@@ -213,53 +213,53 @@ mutual
     spaces *> token ':' *> spaces
     b <- parseTy
     token '.' *> spaces
-    E expr <- parseSyn
-    return $ E $ LamRec vf a v b expr
+    E expr <- parseTerm
+    return $ E $ LamRec vf v a b expr
 
-  covering parseLet : (Monad m, Catchable m String) => SynParser m
+  covering parseLet : (Monad m, Catchable m String) => TermParser m
   parseLet = do
     string "let" *> spaces
     parseUnpackingLet <|> parseSimpleLet
   where
-    parseUnpackingLet : (Monad m, Catchable m String) => SynParser m
+    parseUnpackingLet : (Monad m, Catchable m String) => TermParser m
     parseUnpackingLet = do
       vs <- between (token '(') (token ')') (sep1 (spaces *> token ',' *> spaces) parseIdent)
       spaces *> token '=' *> spaces
-      E s <- parseSyn
+      E s <- parseTerm
       spaces1 *> string "in" *> spaces1
-      E t <- parseSyn
-      let [s', t'] = liftSyns [s, t]
+      E t <- parseTerm
+      let [s', t'] = liftTerms [s, t]
       return $ E $ Unpack (toVect vs) s' t'
 
-    parseSimpleLet : (Monad m, Catchable m String) => SynParser m
+    parseSimpleLet : (Monad m, Catchable m String) => TermParser m
     parseSimpleLet = do
       v <- parseIdent
       spaces *> token '=' *> spaces
-      E s <- parseSyn
+      E s <- parseTerm
       spaces1 *> string "in" *> spaces1
-      E t <- parseSyn
-      let [s', t'] = liftSyns [s, t]
-      return $ E $ Let v (liftSyn lteS s') t'
+      E t <- parseTerm
+      let [s', t'] = liftTerms [s, t]
+      return $ E $ Let v (liftTerm lteS s') t'
 
-  covering parseCase : (Monad m, Catchable m String) => SynParser m
+  covering parseCase : (Monad m, Catchable m String) => TermParser m
   parseCase = do
     string "case" *> spaces1
-    s <- parseSyn
+    s <- parseTerm
     spaces1 *> string "of" *> spaces1
     token '{' *> spaces
     let separator = spaces *> token ';' *> spaces
-    ss <- sep1 separator parseSyn
+    ss <- sep1 separator parseTerm
     maybe separator *> spaces *> token '}'
-    let (s' :: ss') = liftExSyns (s :: toVect ss)
+    let (s' :: ss') = liftExTerms (s :: toVect ss)
     return $ E $ Case s' ss'
 
-  covering parseVariant : (Monad m, Catchable m String) => SynParser m
+  covering parseVariant : (Monad m, Catchable m String) => TermParser m
   parseVariant = do
     string "variant" *> spaces1
     i <- parseNat
     spaces1
     E s <- parseVariant <|>
-      parseParenSyn <|>
+      parseParenTerm <|>
       parseLamRec <|>
       parseLet <|>
       parseLam <|>
@@ -270,28 +270,28 @@ mutual
       parseVar
     return $ E $ Variant i s
 
-  covering parseParenSyn : (Monad m, Catchable m String) => SynParser m
-  parseParenSyn = do
+  covering parseParenTerm : (Monad m, Catchable m String) => TermParser m
+  parseParenTerm = do
     token '(' *> spaces
-    expr <- parseSyn
+    expr <- parseTerm
     parseTuple expr <|> parseEndParen expr
   where
-    parseEndParen : (Monad m, Catchable m String) => Ex Syn -> SynParser m
+    parseEndParen : (Monad m, Catchable m String) => Ex Term -> TermParser m
     parseEndParen expr = do
       spaces *> token ')'
       return expr
 
-    parseTuple : (Monad m, Catchable m String) => Ex Syn -> SynParser m
+    parseTuple : (Monad m, Catchable m String) => Ex Term -> TermParser m
     parseTuple x = do
       let separator = spaces *> token ',' *> spaces
-      xs <- separator *> sep1 separator parseSyn
+      xs <- separator *> sep1 separator parseTerm
       token ')'
-      return $ E $ Tuple (liftExSyns (x :: toVect xs))
+      return $ E $ Tuple (liftExTerms (x :: toVect xs))
 
-covering parseDef : (Monad m, Catchable m String) => StringParser m (String, Ex Syn)
+covering parseDef : (Monad m, Catchable m String) => StringParser m (String, Ex Term)
 parseDef = do
   string "def" *> spaces1
   name <- parseIdent
   spaces1 *> token '=' *> spaces1
-  s <- parseSyn
+  s <- parseTerm
   return (name, s)

@@ -29,52 +29,52 @@ toHVectId = replace mapIdNeutral . toHVect
 [] ++ ys = ys
 (x :: xs) ++ ys = x :: xs ++ ys
 
-unzipEx : (xs : Vect n (Ex p)) -> All p (map Ex.fst xs)
+unzipEx : (as : Vect n (Ex p)) -> All p (map Ex.fst as)
 unzipEx [] = []
 unzipEx (E x :: xs) = x :: unzipEx xs
 
-mapToVect : {ps : Vect n a} -> {p : a -> Type} -> (f : {x : a} -> p x -> q) -> All p ps -> Vect n q
-mapToVect {ps = []} f [] = []
-mapToVect {ps = _ :: _} f (x :: xs) = f x :: mapToVect f xs
+mapToVect : {as : Vect n a} -> {p : a -> Type} -> (f : {x : a} -> p x -> q) -> All p as -> Vect n q
+mapToVect {as = []} f [] = []
+mapToVect {as = _ :: _} f (x :: xs) = f x :: mapToVect f xs
 
-mapToAll : {p : b -> Type} -> {f : a -> b} -> ((x : a) -> p (f x)) -> (xs : Vect n a) -> All p (map f xs)
+mapToAll : {p : b -> Type} -> {f : a -> b} -> ((x : a) -> p (f x)) -> (as : Vect n a) -> All p (map f as)
 mapToAll f [] = []
 mapToAll f (x :: xs) = f x :: mapToAll f xs
 
-mapToAll' : {p : a -> Type} -> ((x : a) -> p x) -> (xs : Vect n a) -> All p xs
+mapToAll' : {p : a -> Type} -> ((x : a) -> p x) -> (as : Vect n a) -> All p as
 mapToAll' f [] = []
 mapToAll' f (x :: xs) = f x :: mapToAll' f xs
 
-zipWithToVect : {ps : Vect n a} -> ({x : a} -> p x -> q x -> c) -> All p ps -> All q ps -> Vect n c
-zipWithToVect {ps = []} f [] [] = []
-zipWithToVect {ps = _ :: _} f (x :: xs) (y :: ys) = f x y :: zipWithToVect f xs ys
+zipWithToVect : {as : Vect n a} -> ({x : a} -> p x -> q x -> c) -> All p as -> All q as -> Vect n c
+zipWithToVect {as = []} f [] [] = []
+zipWithToVect {as = _ :: _} f (x :: xs) (y :: ys) = f x y :: zipWithToVect f xs ys
 
-replicate : {ps : Vect n a} -> ({x : a} -> p x) -> All p ps
-replicate {ps = []} x = []
-replicate {ps = _ :: _} x = x :: replicate x
+replicate : {as : Vect n a} -> ({x : a} -> p x) -> All p as
+replicate {as = []} x = []
+replicate {as = _ :: _} x = x :: replicate x
 
-map : (f : a -> b) -> ({x : a} -> p x -> q (f x)) -> All p ps -> All q (map f ps)
-map {ps = []} f g [] = []
-map {ps = _ :: _} f g (x :: xs) = g x :: map f g xs
+map : (f : a -> b) -> ({x : a} -> p x -> q (f x)) -> All p as -> All q (map f as)
+map {as = []} f g [] = []
+map {as = _ :: _} f g (x :: xs) = g x :: map f g xs
 
-map' : ({x : a} -> p x -> q x) -> All p ps -> All q ps
-map' {ps = []} g [] = []
-map' {ps = _ :: _} g (x :: xs) = g x :: map' g xs
+map' : ({x : a} -> p x -> q x) -> All p as -> All q as
+map' {as = []} g [] = []
+map' {as = _ :: _} g (x :: xs) = g x :: map' g xs
 
-cong : ((x : _) -> p x = q x) -> All p xs -> All q xs
+cong : ((x : _) -> p x = q x) -> All p as -> All q as
 cong eq = map' (replace' (eq _))
 
-index : (i : Fin n) -> All p ps -> p (index i ps)
-index {ps = _ :: _} FZ (x :: _) = x
-index {ps = _ :: _} (FS n) (_ :: xs) = index n xs
+index : (i : Fin n) -> All p as -> p (index i as)
+index {as = _ :: _} FZ (x :: _) = x
+index {as = _ :: _} (FS n) (_ :: xs) = index n xs
 
-indexElem : Elem x ps -> All p ps -> p x
+indexElem : Elem x as -> All p as -> p x
 indexElem Here (x :: _) = x
 indexElem (There p) (_ :: xs) = indexElem p xs
 
-sequence : Applicative m => {p : a -> Type} -> All (m . p) ps -> m (All p ps)
-sequence {ps = []} [] = pure []
-sequence {ps = _ :: _} (x :: xs) = [| x :: sequence xs |]
+sequence : Applicative m => {p : a -> Type} -> All (m . p) as -> m (All p as)
+sequence {as = []} [] = pure []
+sequence {as = _ :: _} (x :: xs) = [| x :: sequence xs |]
 
-sequenceMap' : Applicative m => ({x : a} -> p x -> m (q x)) -> All p xs -> m (All q xs)
+sequenceMap' : Applicative m => ({x : a} -> p x -> m (q x)) -> All p as -> m (All q as)
 sequenceMap' f = sequence . map' f

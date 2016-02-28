@@ -1,28 +1,22 @@
 module Show
 
-import Data.Fin
 import Data.HVect
 import Data.Vect
-import Data.Vect.Quantifiers
 
-import ParseSyntax
-import Partial
-import Scopecheck
-import Syntax
-import Term
-import Ty
-import Typecheck
+import Term.Raw
+import Term.Scopecheck
+import Term.Scoped
+import Term.Typecheck
+import Ty.Raw
+import Ty.Scoped
+import Ty.Val
 
-import Util.All
-import Util.Elem
-import Util.Eq
 import Util.Ex
-import Util.Fin
 import Util.Union
 
 %default total
 
-Show SynTy where
+Show Raw.Ty where
   show NUM = "Num"
   show (Sum [Tuple [], Tuple []]) = "Bool"
   show (Tuple tys) = "(" ++ concat (intersperse ", " (map (assert_total show) tys)) ++ ")"
@@ -30,12 +24,12 @@ Show SynTy where
   show ((s :-> t) :-> r) = "(" ++ show (s :-> t) ++ ")" ++ " -> " ++ show r
   show (s :-> t) = show s ++ " -> " ++ show t
 
--- this probably gets parentheses wrong sometimes
-Show (Syn d) where
+-- this might get parentheses wrong sometimes
+Show (Raw.Term d) where
   show (Var v) = v
   show (Num x) = show x
   show (Bool x) = if x then "true" else "false"
-  show (LamRec vf a v b s) = "(fn " ++ vf ++ "(" ++ v ++ ": " ++ show a ++ "): " ++ show b ++ ". " ++ show s ++ ")"
+  show (LamRec vf v a b s) = "(fn " ++ vf ++ "(" ++ v ++ ": " ++ show a ++ "): " ++ show b ++ ". " ++ show s ++ ")"
   show (Lam name ty body) = "\\" ++ name ++ ": " ++ show ty ++ ". " ++ show body
   show (Lam v ty x :$ Lam v' ty' x') = "(" ++ show (Lam v ty x) ++ ") (" ++ show (Lam v' ty' x') ++ ")"
   show (x :$ Lam v ty y) = show x ++ " (" ++ show (Lam v ty y) ++ ")"
@@ -52,19 +46,18 @@ Show (Syn d) where
   show (s `As` ty) = "(" ++ show s ++ " : " ++ show ty ++ ")"
 
 mutual
-  showTuple : (as : Vect n SynTy) -> SynVal e (Tuple as) -> String
+  showTuple : (as : Vect n Raw.Ty) -> SynVal e (Tuple as) -> String
   showTuple as xs = "(" ++ showTuple' as xs ++ ")"
     where
-      showTuple' : (as : Vect n SynTy) -> SynVal e (Tuple as) -> String
+      showTuple' : (as : Vect n Raw.Ty) -> SynVal e (Tuple as) -> String
       showTuple' [] [] = ""
       showTuple' [a] [x] = assert_total (showVal a x)
       showTuple' (a :: as) (x :: xs) = assert_total (showVal a x) ++ ", " ++ showTuple' as xs
   
-  -- this is wrong (it strips off leading types)
-  showSum : (as : Vect n SynTy) -> Nat -> SynVal e (Sum as) -> String
+  showSum : (as : Vect n Raw.Ty) -> Nat -> SynVal e (Sum as) -> String
   showSum as i xs = concat $ the (List String) ["(variant ", show i, " ", showSum' as xs, ")"]
     where
-      showSum' : (as : Vect n SynTy) -> SynVal e (Sum as) -> String
+      showSum' : (as : Vect n Raw.Ty) -> SynVal e (Sum as) -> String
       showSum' (a :: _) (Inj Here x) = assert_total (showVal a x)
       showSum' (_ :: as) (Inj (There p) x) = showSum' as (Inj p x)
 
@@ -86,7 +79,7 @@ Show TypeError where
       If => "if"
       Variant => "variant"
       LamRec => "lam rec"
-      As s ty ty' => show (unscope s) ++ " is of type " ++ show ty' ++ " but should be of type " ++ show ty
+      As t a b => show (unscope t) ++ " is of type " ++ show b ++ " but should be of type " ++ show a
       CantInfer => "can't infer"
       Case => "case"
       Unpack => "unpack"
