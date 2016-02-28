@@ -46,4 +46,4 @@ primitiveTerms =
   ]
 
 primitiveVals : All (SynVal []) Primitives.primitiveTys
-primitiveVals = map' {ps = primitiveTys} (impatience . eval [] []) primitiveTerms
+primitiveVals = map' (impatience . eval [] []) primitiveTerms
