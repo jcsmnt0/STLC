@@ -11,6 +11,7 @@ import Ty.Raw
 import Util.Elem
 
 %default total
+%access export
 
 scopecheck :
   (Applicative m, Catchable m String) =>

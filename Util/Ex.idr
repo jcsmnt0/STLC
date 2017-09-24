@@ -1,6 +1,7 @@
 module Ex
 
 %default total
+%access export
 
 infixr 0 $$
 
@@ -8,6 +9,7 @@ infixr 0 $$
 ||| Ex b <=> (x : _ ** b _)
 ||| E y <=> (_ ** y)
 ||| (could probably be a syntax definition instead?)
+public export
 data Ex : (a -> Type) -> Type where
   E : b x -> Ex b
 

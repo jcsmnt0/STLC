@@ -12,7 +12,7 @@ namespace Dependent
   fst : {b : a -> Type} -> (x : a ** b x) -> a
   fst (x ** _) = x
 
-  snd : {b : a -> Type} -> (pr : (x : a ** b x)) -> b (fst pr)
+  snd : {b : a -> Type} -> (pr : (x : a ** b x)) -> b (Dependent.fst pr)
   snd (_ ** y) = y
 
   uncurry :
@@ -20,5 +20,5 @@ namespace Dependent
     {c : (x : a) -> b x -> Type} ->
     ((x : a) -> (y : b x) -> c x y) ->
     (pr : (x ** b x)) ->
-    c (fst pr) (snd pr)
+    c (Dependent.fst pr) (Dependent.snd pr)
   uncurry f (x ** y) = f x y

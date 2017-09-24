@@ -8,11 +8,13 @@ import Data.Vect.Quantifiers
 import Util.Elem
 
 %default total
+%access public export
 
 data Catcher : Vect n Type -> Type -> Type where
   Return : b -> Catcher as b
   Throw : Elem a as -> a -> Catcher as b
 
+export
 handle : All (\a => a -> b) as -> Catcher as b -> b
 handle _ (Return x) = x
 handle {as = []} _ (Throw Here x) impossible
@@ -34,6 +36,7 @@ Monad (Catcher as) where
   (Return x) >>= f = f x
   (Throw p x) >>= _ = Throw p x
 
+export
 catchElem : Elem a as -> Catcher as b -> (a -> c) -> Maybe c
 catchElem Here (Throw Here x) f = Just (f x)
 catchElem {b = b} (There p) (Throw (There q) x) f = catchElem p (Throw {b = b} q x) f
@@ -70,7 +73,7 @@ Monad m => Monad (CatcherT as m) where
   (CT x) >>= f = CT $ do
     case !x of
       Return x' => runCatcherT (f x')
-      Throw p x' => return (Throw p x')
+      Throw p x' => pure (Throw p x')
 
 (Element n a as, Monad m) => Catchable (CatcherT as m) a where
   throw = CT . pure . throw

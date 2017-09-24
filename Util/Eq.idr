@@ -1,14 +1,11 @@
 module Util.Eq
 
-import Util.Dec
-
 %default total
+
+%access export
 
 cong2 : {a, b, c : Type} -> {f : a -> b -> c} -> {x, y : a} -> {z, w : b} -> x = y -> z = w -> f x z = f y w
 cong2 Refl Refl = Refl
-
-Requires (x = y) (y = x) where
-  because contra Refl = contra Refl
 
 replacePreservesEquality : {P : a -> Type} -> (x : P u) -> (p : u = v) -> x = replace {P = P} p x
 replacePreservesEquality x Refl = Refl

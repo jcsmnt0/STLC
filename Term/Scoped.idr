@@ -9,6 +9,7 @@ import Ty.Raw
 infixl 9 :$
 
 ||| Terms that are well-scoped under g, i.e. ones that don't contain any Var subterms with unbound identifiers.
+public export
 data Term : (d : Nat) -> (g : Vect n String) -> Type where
   Var : Elem v g -> Term d g
   Num : Nat -> Term d g

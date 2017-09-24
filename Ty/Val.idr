@@ -14,6 +14,7 @@ import Util.Union
 
 %default total
 
+public export
 Val : Vect l Type -> Ty l -> Type
 Val e (C a) = a
 Val e (Var i) = index i e
@@ -21,9 +22,11 @@ Val e (a :-> b) = Val e a -> Partial (Val e b)
 Val e (Tuple as) = HVect (map (assert_total $ Val e) as)
 Val e (Sum as) = Union (map (assert_total $ Val e) as)
 
+public export
 SynVal : Vect n Type -> Raw.Ty -> Type
 SynVal e = Val e . fromRawTy
 
+public export
 normalize : Vect l Type -> Ty l -> Ty l
 normalize e = C . Val e
 
@@ -47,6 +50,7 @@ mutual
 betaReduceTy : Val e (a :@ b) -> Val (Val e b :: e) a
 betaReduceTy = replace' betaValLemma
 
+export
 betaExpandTy : Val (Val e b :: e) a -> Val e (a :@ b)
 betaExpandTy = replace' (sym betaValLemma)
 
@@ -59,9 +63,12 @@ weaken = replace' weakenValLemma
 strengthen : Val (b :: e) (weaken a) -> Val e a
 strengthen = replace' (sym weakenValLemma)
 
+public export
 Env : Vect l Type -> Ctx l n -> Type
 Env e = All (Val e)
 
 namespace Env
+  export
   weaken : {e : Vect l Type} -> {g : Ctx l n} -> Env e g -> Env (a :: e) (weaken g)
   weaken = map weaken Val.weaken
+

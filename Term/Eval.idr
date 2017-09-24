@@ -17,7 +17,7 @@ import Util.Union
 mutual
   -- this does pass the totality checker (modulo the one assert_total call in the Case case) but it takes
   -- a loooong time to do so, at least on my desktop
-  %assert_total
+  export
   eval : (e : Vect l Type) -> Env e g -> Term d l g a -> Partial (Val e a)
   eval e p (C x) = x
   eval e p (Var i) = Now $ index i p
@@ -27,7 +27,7 @@ mutual
   eval e p (LamRec {a = a} {b = b} t) = Now $ \x => eval e (recurse :: x :: p) t
     where
       recurse : Val e a -> Partial (Val e b)
-      recurse x = Later (Later (eval e p (LamRec t)) >>= flip apply x)
+      recurse x = Later (Later (assert_total $ eval e p (LamRec t)) >>= flip apply x)
   eval e p (s :$ t) = do
     s' <- eval e p s
     t' <- eval e p t
@@ -41,7 +41,8 @@ mutual
   eval e p (Variant i t) = Inj (map _ i) <$> eval e p t
   eval {d = S (S (S d))} e p (Case t ts) = do
     Inj i t' <- eval e p t
-    f <- indexCase e p i ts
+    -- add assert_total to make the totality checking a little faster
+    f <- assert_total $ indexCase e p i ts
     -- I'm not sure why this isn't accepted as total - d is obviously decreasing?
     f' <- assert_total $ eval {d = 2 + d} e p f
     f' t'
@@ -54,7 +55,7 @@ mutual
     Partial (Term (2 + d) l g (normalize e a :-> normalize e b))
   normalizeFunction e p t = do
     t' <- eval e p t
-    return $ Lam $ Prim (C . t') (Var 0)
+    pure $ Lam $ Prim (C . t') (Var 0)
 
   indexCase :
     (e : Vect l Type) ->

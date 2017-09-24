@@ -13,6 +13,7 @@ import Util.Partial
 
 infixl 9 :$, @$
 
+public export
 data Term : Nat -> (l : Nat) -> Ctx l n -> Ty l -> Type where
   C :
     Partial a ->
@@ -72,6 +73,7 @@ data Term : Nat -> (l : Nat) -> Ctx l n -> Ty l -> Type where
     All (\a => Term d l g (a :-> b)) as ->
     Term (3 + d) l g b -- +3 to account for the Lam and Prim in normalizeFunction during evaluation
 
+public export
 SynTerm : Nat -> Nat -> Vect n Raw.Ty -> Raw.Ty -> Type
 SynTerm d l g = Term d l (map fromRawTy g) . fromRawTy
 
@@ -82,26 +84,31 @@ deepenN : (n : Nat) -> Term d l g a -> Term (n + d) l g a
 deepenN Z = id
 deepenN (S n) = Deepen . deepenN n
 
+public export
 C' : a -> Term d l g (C a)
 C' = C . Now
 
 unit : Term (1 + d) 0 g UNIT -- https://youtu.be/CaxDRF_TKjg
 unit = Tuple []
 
+export
 true : Term (2 + d) 0 g BOOL
 true = Variant Here unit
 
+export
 false : Term (2 + d) 0 g BOOL
 false = Variant (There Here) unit
 
+export
 bool : Bool -> Term (2 + d) 0 g BOOL
 bool x = if x then true else false
 
-if' : Term (7 + d) 1 g (BOOL :-> LAZY 0 :-> LAZY 0 :-> 0)
+if' : Term (7 + d) 1 g (BOOL :-> LAZY (Var 0) :-> LAZY (Var 0) :-> (Var 0))
 if' = Lam $ Lam $ Lam $ Case (Var 2)
   [ Var 1
   , Var 0
   ]
-
+  
+export
 If : Term d 0 g BOOL -> Term d 0 g a -> Term d 0 g a -> Term (11 + d) 0 g a
 If s t u = (if' :@ _) :$ deepenN 8 s :$ deepenN 8 (Lam (Weaken t)) :$ deepenN 9 (Lam (Weaken u))

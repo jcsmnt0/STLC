@@ -12,10 +12,12 @@ elemToNat : Elem x xs -> Nat
 elemToNat Here = Z
 elemToNat (There p) = S (elemToNat p)
 
+export
 toFin : {xs : Vect n a} -> Elem x xs -> Fin n
 toFin Here = FZ
 toFin (There i) = FS (toFin i)
 
+export
 fromFin : (i : Fin n) -> (xs : Vect n a) -> Elem (index i xs) xs
 fromFin FZ (x :: xs) = Here
 fromFin (FS i) (_ :: xs) = let p = fromFin i xs in There p
@@ -32,17 +34,21 @@ mapWithElem : (xs : Vect n a) -> ({x : a} -> Elem x xs -> b) -> Vect n b
 mapWithElem [] _ = []
 mapWithElem (x :: xs) f = f Here :: mapWithElem xs (f . There)
 
+export
 map : (f : a -> b) -> Elem x xs -> Elem (f x) (map f xs)
 map _ Here = Here
 map f (There p) = There (map f p)
 
+{--
 Uninhabited (Elem x []) where
   uninhabited Here impossible
+--}
 
 notElem : Not (x = y) -> Not (Elem x ys) -> Not (Elem x (y :: ys))
 notElem notHere _ Here = notHere Refl
 notElem _ notThere (There p) = notThere p
 
+export
 decElem : DecEq a => (x : a) -> (xs : Vect n a) -> Dec (Elem x xs)
 decElem x [] = No uninhabited
 decElem x (y :: ys) with (x =? y)

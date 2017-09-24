@@ -11,14 +11,15 @@ import Parser
 import Util.All
 import Util.Ex
 import Util.LTE
-import Util.Sigma
 import Util.Vect
 
 %default total
 
+public export
 TermParser : (Type -> Type) -> Type
 TermParser m = StringParser m (Ex Term)
 
+public export
 TyParser : (Type -> Type) -> Type
 TyParser m = StringParser m Ty
 
@@ -48,6 +49,9 @@ keywords =
   , "def"
   ]
 
+E0 : b Z -> Ex b
+E0 = E
+
 liftTerm : (m `LTE` n) -> Term m -> Term n
 liftTerm p (Var v) = Var v
 liftTerm p (Num x) = Num x
@@ -63,19 +67,18 @@ liftTerm (LTESucc p) (Unpack vs s t) = Unpack vs (liftTerm p s) (liftTerm p t)
 liftTerm (LTESucc (LTESucc (LTESucc p))) (Case s ss) = Case (liftTerm p s) (map (liftTerm p) ss)
 
 -- dear god
+-- if type checking runs out of memory,
+-- disable coverage checking with --nocoverage
 liftTerm
   (LTESucc (LTESucc (LTESucc (LTESucc (LTESucc (LTESucc (LTESucc (LTESucc (LTESucc (LTESucc (LTESucc p)))))))))))
   (If sb st sf) =
     If (liftTerm p sb) (liftTerm p st) (liftTerm p sf)
 
-liftTerms : {ds : Vect n Nat} -> (ss : All Term ds) -> Vect n (Term (fst (upperBound ds)))
+liftTerms : {ds : Vect n Nat} -> (ss : All Term ds) -> Vect n (Term (DPair.fst (upperBound ds)))
 liftTerms {ds = ds} ss = zipWithToVect liftTerm (snd (upperBound ds)) ss
 
 liftExTerms : (ss : Vect n (Ex Term)) -> Vect n (Term (fst (upperBound (map fst ss))))
 liftExTerms ss = liftTerms (unzipEx ss)
-
-E0 : b Z -> Ex b
-E0 = E
 
 -- I actually want %default covering here but it doesn't exist
 %default partial
@@ -94,8 +97,8 @@ parseTy = parseLamRecTy <|> parseParenTy <|> parseBaseTy
     parseBaseTy = do
       ty <- many (match isLowercaseLetter <|> match isUppercaseLetter)
       case pack ty of
-        "Num" => return NUM
-        "Bool" => return BOOL
+        "Num" => pure NUM
+        "Bool" => pure BOOL
         ty' => failWith (pack ty ++ " isn't a valid type")
 
     parseParenTy : (Monad m, Catchable m String) => TyParser m
@@ -106,26 +109,27 @@ parseTy = parseLamRecTy <|> parseParenTy <|> parseBaseTy
       parseTupleTy : (Monad m, Catchable m String) => TyParser m
       parseTupleTy = do
         xs <- sep1 (spaces *> token ',' *> spaces) parseTy <* spaces <* token ')'
-        return (Tuple (toVect xs))
+        pure (Tuple (toVect xs))
 
       parseSumTy : (Monad m, Catchable m String) => TyParser m
       parseSumTy = do
         xs <- sep1 (spaces *> token '|' *> spaces) parseTy <* spaces <* token ')'
-        return (Sum (toVect xs))
+        pure (Sum (toVect xs))
 
     parseLamRecTy : (Monad m, Catchable m String) => TyParser m
     parseLamRecTy = do
       a <- parseBaseTy <|> parseParenTy
       let separator = spaces *> string "->" *> spaces
       as <- separator *> sep1 separator parseTy
-      return (foldl (:->) a as)
+      pure (foldl (:->) a as)
 
 covering parseNat : (Monad m, Catchable m String) => StringParser m Nat
 parseNat = do
   xs <- many1 (match isDigit)
-  return (cast {to = Nat} $ cast {to = Int} $ pack xs)
+  pure (cast {to = Nat} $ cast {to = Int} $ pack xs)
 
 mutual
+  export
   covering parseTerm : (Monad m, Catchable m String) => TermParser m
   parseTerm = do
     s <- parseAs <|>
@@ -146,7 +150,7 @@ mutual
   parseApp f = do
     arg <- maybe (spaces1 *> (parseParenTerm <|> parseBool <|> parseNum <|> parseVar))
     case arg of
-      Nothing => return f
+      Nothing => pure f
       Just x => let [f', x'] = liftExTerms [f, x] in parseApp (E (f' :$ x'))
 
   covering parseVar : (Monad m, Catchable m String) => TermParser m
@@ -155,8 +159,8 @@ mutual
   covering parseBool : (Monad m, Catchable m String) => TermParser m
   parseBool =
     case !parseIdent of
-      "true" => return (E $ Bool {d = 2} True)
-      "false" => return (E $ Bool {d = 2} False)
+      "true" => pure (E $ Bool {d = 2} True)
+      "false" => pure (E $ Bool {d = 2} False)
       ident => failWith (ident ++ " isn't a bool literal")
 
   covering parseIf : (Monad m, Catchable m String) => TermParser m
@@ -168,7 +172,7 @@ mutual
     spaces1 *> string "else" *> spaces1
     f <- parseTerm
     let [b', t', f'] = liftExTerms [b, t, f]
-    return $ E $ If b' t' f'
+    pure $ E $ If b' t' f'
 
   covering parseAs : (Monad m, Catchable m String) => TermParser m
   parseAs = do
@@ -184,12 +188,12 @@ mutual
       parseVar
     spaces *> token ':' *> spaces
     ty <- parseTy
-    return $ E $ t `As` ty
+    pure $ E $ t `As` ty
 
   covering parseNum : (Monad m, Catchable m String) => TermParser m
   parseNum = do
     x <- parseNat
-    return $ E0 $ Num x
+    pure $ E0 $ Num x
 
   covering parseLam : (Monad m, Catchable m String) => TermParser m
   parseLam = do
@@ -199,7 +203,7 @@ mutual
     ty <- parseTy
     token '.' *> spaces
     E expr <- parseTerm
-    return $ E $ Lam var ty expr
+    pure $ E $ Lam var ty expr
 
   covering parseLamRec : (Monad m, Catchable m String) => TermParser m
   parseLamRec = do
@@ -214,7 +218,7 @@ mutual
     b <- parseTy
     token '.' *> spaces
     E expr <- parseTerm
-    return $ E $ LamRec vf v a b expr
+    pure $ E $ LamRec vf v a b expr
 
   covering parseLet : (Monad m, Catchable m String) => TermParser m
   parseLet = do
@@ -229,7 +233,7 @@ mutual
       spaces1 *> string "in" *> spaces1
       E t <- parseTerm
       let [s', t'] = liftTerms [s, t]
-      return $ E $ Unpack (toVect vs) s' t'
+      pure $ E $ Unpack (toVect vs) s' t'
 
     parseSimpleLet : (Monad m, Catchable m String) => TermParser m
     parseSimpleLet = do
@@ -239,7 +243,7 @@ mutual
       spaces1 *> string "in" *> spaces1
       E t <- parseTerm
       let [s', t'] = liftTerms [s, t]
-      return $ E $ Let v (liftTerm lteS s') t'
+      pure $ E $ Let v (liftTerm lteS s') t'
 
   covering parseCase : (Monad m, Catchable m String) => TermParser m
   parseCase = do
@@ -251,7 +255,7 @@ mutual
     ss <- sep1 separator parseTerm
     maybe separator *> spaces *> token '}'
     let (s' :: ss') = liftExTerms (s :: toVect ss)
-    return $ E $ Case s' ss'
+    pure $ E $ Case s' ss'
 
   covering parseVariant : (Monad m, Catchable m String) => TermParser m
   parseVariant = do
@@ -268,7 +272,7 @@ mutual
       parseIf <|>
       parseCase <|>
       parseVar
-    return $ E $ Variant i s
+    pure $ E $ Variant i s
 
   covering parseParenTerm : (Monad m, Catchable m String) => TermParser m
   parseParenTerm = do
@@ -279,19 +283,20 @@ mutual
     parseEndParen : (Monad m, Catchable m String) => Ex Term -> TermParser m
     parseEndParen expr = do
       spaces *> token ')'
-      return expr
+      pure expr
 
     parseTuple : (Monad m, Catchable m String) => Ex Term -> TermParser m
     parseTuple x = do
       let separator = spaces *> token ',' *> spaces
       xs <- separator *> sep1 separator parseTerm
       token ')'
-      return $ E $ Tuple (liftExTerms (x :: toVect xs))
+      pure $ E $ Tuple (liftExTerms (x :: toVect xs))
 
+export
 covering parseDef : (Monad m, Catchable m String) => StringParser m (String, Ex Term)
 parseDef = do
   string "def" *> spaces1
   name <- parseIdent
   spaces1 *> token '=' *> spaces1
   s <- parseTerm
-  return (name, s)
+  pure (name, s)

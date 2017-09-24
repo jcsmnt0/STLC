@@ -3,7 +3,7 @@ module Parser
 import Control.Catchable
 import Data.Vect
 
-%access public
+%access export
 
 %default partial
 
@@ -20,6 +20,7 @@ Sequence String Char where
 
 %default total
 
+public export
 Sequence s Char => Sequence (Nat, s) Char where
   cons x (n, xs) = (n, cons x xs) -- pointless but rounds out the definition
 
@@ -29,31 +30,38 @@ Sequence s Char => Sequence (Nat, s) Char where
       Just (c, xs') => Just (c, (n, xs'))
       Nothing => Nothing
 
+public export
 Sequence (List a) a where
   cons = (::)
   uncons [] = Nothing
   uncons (x :: xs) = Just (x, xs)
 
+public export
 data Result : Type -> Type -> Type where
   MkResult : o -> s -> Result s o
 
+public export
 Show o => Show (Result s o) where
   show (MkResult x _) = show x
 
+public export
 Functor (Result i) where
   map f (MkResult x sf) = MkResult (f x) sf
 
 output : Result i o -> o
 output (MkResult x _) = x
 
+public export
 data Parser : (Type -> Type) -> Type -> Type -> Type -> Type -> Type where
   MkParser : Sequence s i => (s -> m (Result s o)) -> Parser m e s i o
 
 -- this is so the library parsers can throw strings as errors while letting higher level parsers use other kinds
 -- of values as errors
+public export
 interface ParseError e where
   fromString : String -> e
 
+public export
 ParseError String where
   fromString = id
 
@@ -63,31 +71,36 @@ runParser (MkParser f) = f
 execParser : (Functor m, Catchable m e) => Parser m e s i o -> s -> m o
 execParser f xs = map output (runParser f xs)
 
+public export
 (Monad m, Catchable m e, Sequence s i, Semigroup o) => Semigroup (Parser m e s i o) where
   p <+> q = MkParser $ \i => do
     MkResult op i' <- runParser p i
     MkResult oq i'' <- runParser q i'
-    return (MkResult (op <+> oq) i'')
+    pure (MkResult (op <+> oq) i'')
 
+public export
 (Monad m, Catchable m e, Sequence s i, Monoid o) => Monoid (Parser m e s i o) where
-  neutral = MkParser $ \i => return (MkResult neutral i)
+  neutral = MkParser $ \i => pure (MkResult neutral i)
 
+public export
 (Functor m, Sequence s i) => Functor (Parser m e s i) where
   map f (MkParser g) = MkParser $ \i => map f <$> g i
 
+public export
 (Monad m, Catchable m e, Sequence s i) => Applicative (Parser m e s i) where
-  pure x = MkParser $ \i => return (MkResult x i)
+  pure x = MkParser $ \i => pure (MkResult x i)
 
   p <*> q = MkParser $ \i => do
     MkResult op i' <- runParser p i
     MkResult oq i'' <- runParser q i'
-    return (MkResult (op oq) i'')
+    pure (MkResult (op oq) i'')
 
+public export
 (Monad m, Catchable m e, Sequence s i) => Monad (Parser m e s i) where
   g >>= f = MkParser $ \i => do
     MkResult o i' <- runParser g i
     MkResult o' i'' <- runParser (f o) i'
-    return (MkResult o' i'')
+    pure (MkResult o' i'')
 
 failWith : (Catchable m e, Sequence s i) => e -> Parser m e s i o
 failWith err = MkParser (const (throw err))
@@ -123,10 +136,10 @@ any : (Monad m, Catchable m e, Sequence s i, ParseError e) => Parser m e s i i
 any {e = e} = MkParser $ \i =>
   case uncons i of
     Nothing => throw {t = e} (fromString "any failed: no input")
-    Just (x, xs) => return (MkResult x xs)
+    Just (x, xs) => pure (MkResult x xs)
 
 maybe : (Monad m, Catchable m e, Sequence s i, ParseError e) => Parser m e s i o -> Parser m e s i (Maybe o)
-maybe {e = e} p = MkParser $ \i => catch {t = e} (runParser (Just <$> p) i) (const (return (MkResult Nothing i)))
+maybe {e = e} p = MkParser $ \i => catch {t = e} (runParser (Just <$> p) i) (const (pure (MkResult Nothing i)))
 
 matchMap : (Monad m, Catchable m e, Sequence s i, ParseError e) => (i -> Maybe o) -> Parser m e s i o
 matchMap {e = e} f = MkParser $ \i =>
@@ -135,7 +148,7 @@ matchMap {e = e} f = MkParser $ \i =>
     Just (x, xs) =>
       case f x of
         Nothing => throw {t = e} (fromString "matchMap failed: bad input")
-        Just x => return (MkResult x xs)
+        Just x => pure (MkResult x xs)
 
 match : (Monad m, Catchable m e, Sequence s i, ParseError e) => (i -> Bool) -> Parser m e s i i
 match f = matchMap (\x => if f x then Just x else Nothing) <|> throwStr "match failed"
@@ -156,20 +169,20 @@ covering many : (Monad m, Catchable m e, Sequence s i, ParseError e) => Parser m
 many p = do
   x <- maybe p
   case x of
-    Nothing => return []
-    Just x' => return (x' :: !(many p))
+    Nothing => pure []
+    Just x' => pure (x' :: !(many p))
 
 covering many' : (Monad m, Catchable m e, Sequence s i, ParseError e) => Parser m e s i o -> Parser m e s i ()
 many' p = do
   x <- maybe p
   case x of
-    Nothing => return ()
+    Nothing => pure ()
     Just _ => many' p
 
 guard : (Monad m, Catchable m e, Sequence s i, ParseError e) => (o -> Bool) -> Parser m e s i o -> Parser m e s i o
 guard f p = do
   x <- p
-  if f x then return x else throwStr "guard failed"
+  if f x then pure x else throwStr "guard failed"
 
 iff : (Monad m, Catchable m e, Sequence s i, ParseError e) => Parser m e s i o -> (o -> Bool) -> Parser m e s i o
 iff = flip guard
@@ -208,5 +221,6 @@ spaces = many (match isSpace)
 covering spaces1 : (Monad m, Catchable m e, Sequence s Char, ParseError e, Semigroup e) => Parser m e s Char (List Char)
 spaces1 = many1 (match isSpace) <|> throwStr "spaces1 failed"
 
+public export
 StringParser : (Type -> Type) -> Type -> Type
 StringParser m = Parser m String String Char

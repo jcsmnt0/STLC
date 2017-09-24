@@ -5,6 +5,7 @@ import Data.Vect.Quantifiers
 
 %default total
 
+export
 decLTE : (m, n : Nat) -> Either (LTE m n) (LTE n m)
 decLTE Z _ = Left LTEZero
 decLTE _ Z = Right LTEZero
@@ -21,6 +22,7 @@ trans : x `LTE` y -> y `LTE` z -> x `LTE` z
 trans LTEZero q = LTEZero
 trans (LTESucc p) (LTESucc q) = LTESucc (trans p q)
 
+export
 lteS : x `LTE` S x
 lteS {x = Z} = LTEZero
 lteS {x = S _} = LTESucc lteS
@@ -33,6 +35,7 @@ raise : All (\x => x `LTE` y) xs -> y `LTE` z -> All (\x => x `LTE` z) xs
 raise {xs = []} [] _ = []
 raise {xs = _ :: _} (p :: ps) q = trans p q :: raise ps q
 
+public export
 upperBound : (xs : Vect n Nat) -> (y ** All (\x => x `LTE` y) xs)
 upperBound [] = (Z ** [])
 upperBound [x] = (x ** [lteRefl])

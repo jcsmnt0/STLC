@@ -20,6 +20,7 @@ import Util.Vect
 
 -- todo: make these useful
 namespace TypeError
+  public export
   data TypeError
     = App
     | If
@@ -57,6 +58,7 @@ makeUnpackTerm {d = d} {b = b} Refl s t =
   Unpack s $ replace {P = \g' => Term d 0 g' (fromRawTy b)} mapDistributesOverAppend t
 
 mutual
+  export
   typecheck :
     (Monad m, Catchable m TypeError) =>
     {gv : Vect n String} ->
@@ -65,40 +67,40 @@ mutual
     m (Ex $ SynTerm d 0 g)
 
   typecheck g (Var {v = v} i) =
-    return $ E {x = index (toFin i) g} $
+    pure $ E {x = index (toFin i) g} $
       replace
         {P = Term _ 0 (map fromRawTy g)}
         indexDistributesOverMap
         (Var (toFin i))
 
   typecheck g (Num n) =
-    return $ E {x = NUM} $ C' n
+    pure $ E {x = NUM} $ C' n
 
   typecheck g (Bool b) =
-    return $ E {x = BOOL} $ if b then true else false
+    pure $ E {x = BOOL} $ if b then true else false
 
   typecheck g (LamRec {d = d} a b t) =
     E {x = a :-> b} . LamRec <$> typecheckAgainst (a :-> b :: a :: g) t b (const TypeError.LamRec)
 
   typecheck g (Lam a t) = do
     E t' <- typecheck (a :: g) t
-    return $ E {x = a :-> _} $ Lam t'
+    pure $ E {x = a :-> _} $ Lam t'
 
   typecheck g (s :$ t) = do
     E {x = a :-> b} s' <- typecheck g s | throw TypeError.App
     t' <- typecheckAgainst g t a (const TypeError.App)
-    return $ E (s' :$ t')
+    pure $ E (s' :$ t')
 
   typecheck g (If s t u) = do
     s' <- typecheckAgainst g s (Sum [Tuple [], Tuple []]) (const TypeError.If)
     E {x = a} t' <- typecheck g t
     -- I think it might be a bug that assert_total is required here and for the Case case - d is decreasing
     u' <- assert_total $ typecheckAgainst g u a (const TypeError.If)
-    return $ E $ If s' t' u'
+    pure $ E $ If s' t' u'
 
   typecheck g (Tuple ts) = do
     ts' <- sequence $ map (typecheck g) ts
-    return $ E {x = Tuple (map Ex.fst ts')} $ Tuple (map fromRawTy id (unzipEx ts'))
+    pure $ E {x = Tuple (map Ex.fst ts')} $ Tuple (map fromRawTy id (unzipEx ts'))
 
   typecheck g (Variant i s) =
     throw TypeError.Variant
@@ -108,7 +110,7 @@ mutual
     case natToFin i n of
       Just i' => case index i' as =? a of
         Yes p =>
-          return $ E {x = Sum as} $ Variant (fromFin i' (map fromRawTy as)) $
+          pure $ E {x = Sum as} $ Variant (fromFin i' (map fromRawTy as)) $
             replace (sym (trans indexDistributesOverMap (cong p))) t'
         No _ => throw TypeError.Variant
       Nothing => throw TypeError.Variant
@@ -119,7 +121,7 @@ mutual
     case n' =? n of
       Yes p => do
         E ts' <- assert_total $ typecheckCaseVect g (replace {P = flip Vect Raw.Ty} p as) ts
-        return $ E $ makeCaseTerm {m = m} p t' ts'
+        pure $ E $ makeCaseTerm {m = m} p t' ts'
       No _ => throw TypeError.Case
 
   typecheck {m = m} {n = gn} g (Unpack {d = d} {n = n} s t) = do
@@ -127,7 +129,7 @@ mutual
     case n' =? n of
       Yes p => do
         E t' <- assert_total $ typecheck (replace {P = flip Vect Raw.Ty} p as ++ g) t
-        return $ E $ makeUnpackTerm {m = m} p s' t'
+        pure $ E $ makeUnpackTerm {m = m} p s' t'
       No _ => throw TypeError.Unpack
 
   typecheck {m = m} g (t `As` a) =
@@ -136,7 +138,7 @@ mutual
   typecheck g (Let {v = v} s t) = do
     E {x = a} s' <- typecheck g s
     E t' <- typecheck (a :: g) t
-    return $ E (Lam t' :$ s')
+    pure $ E (Lam t' :$ s')
 
   typecheckAgainst :
     (Monad m, Catchable m TypeError) =>
@@ -149,7 +151,7 @@ mutual
   typecheckAgainst g t a err = do
     E {x = a'} t' <- typecheck g t
     case a' =? a of
-      Yes p => return $ replace p t'
+      Yes p => pure $ replace p t'
       No _ => throw $ err a'
 
   typecheckCaseVect :
@@ -159,13 +161,13 @@ mutual
     (as : Vect n' Raw.Ty) ->
     Vect n' (Scoped.Term d gv) ->
     m (Ex $ \b => All (\a => SynTerm d 0 g (a :-> b)) as)
-  typecheckCaseVect g [] [] = return $ E {x = VOID} []
+  typecheckCaseVect g [] [] = pure $ E {x = VOID} []
   typecheckCaseVect {d = d} g [a] [t] = do
     E {x = a' :-> b} t' <- typecheck g t | throw TypeError.Case
     case a' =? a of
-      Yes p => return $ E {x = b} [replace {P = \a'' => SynTerm d 0 g (a'' :-> b)} p t']
+      Yes p => pure $ E {x = b} [replace {P = \a'' => SynTerm d 0 g (a'' :-> b)} p t']
       No _ => throw TypeError.Case
   typecheckCaseVect g (a :: as) (t :: ts) = do
     E {x = b} ts' <- typecheckCaseVect g as ts
     t' <- typecheckAgainst g t (a :-> b) (const TypeError.Case)
-    return $ E (t' :: ts')
+    pure $ E (t' :: ts')
