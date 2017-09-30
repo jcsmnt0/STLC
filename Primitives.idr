@@ -14,6 +14,7 @@ import Util.Partial
 
 %default total
 
+export
 primitiveSigs : Vect 3 (String, Raw.Ty)
 primitiveSigs =
   [ ("iszero", NUM :-> BOOL)
@@ -21,9 +22,11 @@ primitiveSigs =
   , ("pred", NUM :-> NUM)
   ]
 
+export
 primitiveNames : Vect (length Primitives.primitiveSigs) String
 primitiveNames = map fst primitiveSigs
 
+export
 primitiveTys : Vect (length Primitives.primitiveSigs) Raw.Ty
 primitiveTys = map snd primitiveSigs
 
@@ -45,5 +48,6 @@ primitiveTerms =
   , pred {g = []}
   ]
 
+export
 primitiveVals : All (SynVal []) Primitives.primitiveTys
 primitiveVals = map' (impatience . eval [] []) primitiveTerms

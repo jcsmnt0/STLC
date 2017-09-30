@@ -14,6 +14,7 @@ infixl 9 :$
 -- some constructors add more than 1 to the depth because the corresponding Scoped.Term and/or Typed.Term value is
 -- actually a compound term that involves multiple constructors, and the scopechecking and typechecking operations
 -- output a term with the same depth as their input argument, but that's probably avoidable.
+public export
 data Term : (d : Nat) -> Type where
   Var : String -> Term d
   Num : Nat -> Term d

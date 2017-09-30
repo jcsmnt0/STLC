@@ -15,7 +15,7 @@ import Util.Ex
 import Util.Union
 
 %default total
-
+%access public export
 Show Raw.Ty where
   show NUM = "Num"
   show (Sum [Tuple [], Tuple []]) = "Bool"
@@ -46,6 +46,7 @@ Show (Raw.Term d) where
   show (s `As` ty) = "(" ++ show s ++ " : " ++ show ty ++ ")"
 
 mutual
+  private 
   showTuple : (as : Vect n Raw.Ty) -> SynVal e (Tuple as) -> String
   showTuple as xs = "(" ++ showTuple' as xs ++ ")"
     where
@@ -54,13 +55,16 @@ mutual
       showTuple' [a] [x] = assert_total (showVal a x)
       showTuple' (a :: as) (x :: xs) = assert_total (showVal a x) ++ ", " ++ showTuple' as xs
   
+  private 
   showSum : (as : Vect n Raw.Ty) -> Nat -> SynVal e (Sum as) -> String
   showSum as i xs = concat $ the (List String) ["(variant ", show i, " ", showSum' as xs, ")"]
     where
       showSum' : (as : Vect n Raw.Ty) -> SynVal e (Sum as) -> String
+      showSum' [] (Inj _ _) impossible
       showSum' (a :: _) (Inj Here x) = assert_total (showVal a x)
       showSum' (_ :: as) (Inj (There p) x) = showSum' as (Inj p x)
-
+  
+  export
   showVal : (a : _) -> SynVal e a -> String
   showVal NUM x = show x
   showVal (Tuple as) xs = showTuple as xs
@@ -69,6 +73,7 @@ mutual
   showVal (Sum as) x = showSum as 0 x
   showVal (a :-> b) f = "function"
 
+export
 showExVal : Ex (SynVal e) -> String
 showExVal (E {x = a} x) = showVal a x ++ " : " ++ show a
 

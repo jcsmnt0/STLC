@@ -53,7 +53,7 @@ All subject to change on a whim, or even possibly for good reasons.
     - Semicolon after the last branch is optional
 
 # How to build
-Just run `idris --build stlc.ipkg` and wait for the `stlc` executable to come into being. This code is tested against Idris 0.10.
+Just run `idris --build stlc.ipkg` and wait for the `stlc` executable to come into being. This code is tested against Idris 1.1.1.
 
 # REPL
 A REPL launches when you run `stlc` with no arguments. Type in an expression and hit Enter to receive the evaluated result. Once you're bored of that, enter `exit` to exit.

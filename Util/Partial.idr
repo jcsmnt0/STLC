@@ -3,11 +3,13 @@ module Partial
 import Util.Monad
 
 %default total
+%access public export
 
 codata Partial : Type -> Type where
   Now : a -> Partial a
   Later : Partial a -> Partial a
 
+export
 uncongNow : Now x = Now y -> x = y
 uncongNow Refl = Refl
 
@@ -16,14 +18,17 @@ namespace Eventually
     Now : p x -> Eventually p (Now x)
     Later : Eventually p (Force x) -> Eventually p (Later x)
 
+export
 hurry : Eventually p (Later x_) -> Eventually p x_
 hurry (Now p) impossible
 hurry (Later p) = p
 
+export
 partial impatience : Partial a -> a
 impatience (Now x) = x
 impatience (Later x) = impatience x
 
+export
 never : Partial a
 never = Later never
 
@@ -54,7 +59,8 @@ namespace partialEq
     Later : Inf (Force x ~~ Force y) -> Later x ~~ Later y
     LaterL : Force x ~~ y -> Later x ~~ y
     LaterR : x ~~ Force y -> x ~~ Later y
-
+  
+  export
   subst : {P : a -> Type} -> x ~~ y -> Eventually P x -> Eventually P y
   subst Now p = p
   subst (Later eq) p = Later (subst eq (hurry p))
@@ -71,6 +77,7 @@ namespace partialGte
     Later : Inf (Force x >=~ Force y) -> Later x >=~ Later y
     LaterL : Force x >=~ y -> Later x >=~ y
 
+  export
   subst : {P : a -> Type} -> x >=~ y -> Eventually P x -> Eventually P y
   subst Now p = p
   subst (Later eq) p = Later (subst eq (hurry p))
@@ -100,6 +107,7 @@ namespace inTime
 Uninhabited (InTime (Later _) 0) where
   uninhabited (Later _) impossible
 
+export
 safeImpatience : {x_ : Partial a} -> (n : Nat) -> InTime x_ n -> a
 safeImpatience _ (Now x) = x
 safeImpatience (S n) (Later x_) = safeImpatience n x_

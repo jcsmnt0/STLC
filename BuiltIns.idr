@@ -14,7 +14,7 @@ import Interpreter
 import Util.Ex
 
 %default partial
-%access public
+%access export
 
 -- just some arbitrary depth large enough for all of these terms
 E' : Raw.Term 100 -> Ex Raw.Term

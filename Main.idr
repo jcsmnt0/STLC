@@ -22,7 +22,7 @@ import Util.Ex
 import Util.Monad
 
 covering handle' : Catcher Errors a -> IO (Maybe a)
-handle' x = handle [\x => putStrLn x >> return Nothing, \x => printLn x >> return Nothing] (return . Just <$> x)
+handle' x = handle [\x => putStrLn x >> pure Nothing, \x => printLn x >> pure Nothing] (pure . Just <$> x)
 
 covering builtinEnv' : IO (Maybe Env)
 builtinEnv' = handle' $ execInterpreter nilEnv (builtinEnv @{monadStateT})
@@ -38,16 +38,16 @@ covering rep : IO Bool
 rep = do
   src <- getLine
   if src == "exit"
-    then return True
+    then pure True
     else do
-      Just (E t) <- handle' $ execParser parseTerm src | _ => return False
-      Just env <- builtinEnv' | _ => return False
-      Just t' <- handle' $ interpretSyn env t | _ => return False
+      Just (E t) <- handle' $ execParser parseTerm src | _ => pure False
+      Just env <- builtinEnv' | _ => pure False
+      Just t' <- handle' $ interpretSyn env t | _ => pure False
       putStrLn $ showExVal t'
-      return False
+      pure False
 
 covering repl : IO ()
-repl = putStrLn "hello\n" *> until id (rep <* putStrLn "") *> return ()
+repl = putStrLn "hello\n" *> until id (rep <* putStrLn "") *> pure ()
 
 main : IO ()
 main = do

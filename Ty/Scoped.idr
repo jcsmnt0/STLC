@@ -8,6 +8,7 @@ import Ty.Raw
 import Util.Eq
 
 %default total
+%access public export
 
 infixr 10 :->
 infixr 9 :@
@@ -41,6 +42,7 @@ fromRawTy (Tuple as) = Tuple $ map (assert_total fromRawTy) as
 fromRawTy (Sum as) = Sum $ map (assert_total fromRawTy) as
 
 -- this is (roughly) automatically implicit because it's a special name
+private
 fromInteger : (x : Integer) -> {default ItIsJust p : IsJust (integerToFin x l)} -> Ty l
 fromInteger x {p = p} = Var $ fromInteger {prf = p} x
 
@@ -72,6 +74,7 @@ namespace Ctx
   weaken = map weaken
 
 mutual
+  export
   weakenApplyCancel : a = weaken a :@ b
   weakenApplyCancel {a = C a} = Refl
   weakenApplyCancel {a = Var FZ} = Refl
@@ -80,6 +83,7 @@ mutual
   weakenApplyCancel {a = Tuple as} {b = b} = cong $ assert_total $ weakenApplyCancelVect as b
   weakenApplyCancel {a = Sum as} {b = b} = cong $ assert_total $ weakenApplyCancelVect as b
 
+  export
   weakenApplyCancelVect : (as : Ctx l n) -> (b : Ty l) -> as = map (:@ b) (map Scoped.weaken as)
   weakenApplyCancelVect [] b = Refl
   weakenApplyCancelVect (a :: as) b = cong2 weakenApplyCancel (weakenApplyCancelVect as b)

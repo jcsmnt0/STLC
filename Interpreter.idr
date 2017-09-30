@@ -29,15 +29,18 @@ import Util.Partial
 
 %default partial
 
+public export
 Env : Type
 Env = Ex $ \n => (Vect n String, Ex (All {n = n} (SynVal [])))
 
+export
 covering nilEnv : Env
 nilEnv = E ([], E [])
 
 covering nilCons : String -> SynVal [] a -> Env -> Env
 nilCons x t (E (xs, E ts)) = E (x :: xs, E (t :: ts))
 
+export
 covering interpretSyn :
   (Monad m, Catchable m String, Catchable m TypeError) =>
   Env ->
@@ -46,41 +49,47 @@ covering interpretSyn :
 interpretSyn (E (names, E {x = as} vals)) t = do
   t' <- scopecheck (names ++ primitiveNames) t
   E t'' <- typecheck (as ++ primitiveTys) t'
-  return $ E $ impatience $ eval [] (map fromRawTy id (vals ++ primitiveVals)) t''
+  pure $ E $ impatience $ eval [] (map fromRawTy id (vals ++ primitiveVals)) t''
 
 covering interpret :
   (MonadState Env m, Catchable m String, Catchable m TypeError, Monad m) =>
   List (String, Ex Raw.Term) ->
   m (Ex (SynVal []))
-interpret [] = return $ E {x = UNIT} $ []
+interpret [] = pure $ E {x = UNIT} $ []
 interpret ((name, E t) :: ts) = do
   x <- get
   E t' <- interpretSyn x t
   modify $ nilCons name t'
   interpret ts
 
+export
 covering interpretEnv :
   (MonadState Env m, Catchable m String, Catchable m TypeError, Monad m) =>
   List (String, Ex Raw.Term) ->
   m Env
 interpretEnv ts = interpret ts >> get
 
+public export
 [monadStateT] (MonadTrans t, Monad m, Monad (t m), MonadState s m) => MonadState s (t m) where
   get = lift get
   put = lift . put
 
+public export
 Errors : Vect 2 Type
 Errors = [String, TypeError]
 
+public export
 Interpreter : Type -> Type
 Interpreter = CatcherT Errors $ StateT Env Identity
 
 covering runInterpreter : Env -> Interpreter a -> (Catcher Errors a, Env)
 runInterpreter env = runIdentity . flip runStateT env . runCatcherT
 
+export
 covering execInterpreter : Env -> Interpreter a -> Catcher Errors a
 execInterpreter env = fst . runInterpreter env
 
+export
 covering interpretSrc : String -> Interpreter String
 interpretSrc src = do
   defs <- execParser (sep1 spaces1 parseDef) src
